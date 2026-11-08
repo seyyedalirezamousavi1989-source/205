@@ -247,7 +247,7 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
         payload["cached"] = True
         return payload
 
-    all_rows, errors, providers_used = [], [], []
+    all_rows, errors = [], []
     query_plan = _query_plan(query, kind)
     # Base query fans out to all configured providers. Targeted site queries use the
     # best available provider first, then DuckDuckGo; this limits API cost and latency.
@@ -255,11 +255,9 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
     base_rows, base_errors = _run_query(base_calls)
     all_rows.extend(base_rows)
     errors.extend(base_errors)
-    providers_used.extend(name for name, _ in base_calls if any(n == name for n, _r in base_rows))
 
     targeted_provider = next((name for name in ("Google / Serper", "Brave Search", "Google CSE", "DuckDuckGo")
                               if any(row_provider == name for row_provider, _ in base_rows)), "DuckDuckGo")
-    provider_map = dict(base_calls)
     if len(query_plan) > 1:
         targeted_calls = []
         for targeted_query in query_plan[1:]:
