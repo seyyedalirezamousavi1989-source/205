@@ -152,6 +152,7 @@ def test_search_api_returns_media_with_intent(server, monkeypatch):
     srv, base = server
     media_search._CACHE.clear()
     monkeypatch.setattr(media_search, "youtube", lambda q, kind="video", limit=5: [media_search._item("Clip", "https://www.youtube.com/watch?v=abcdefghijk", "YouTube", kind, "YouTube")])
+    monkeypatch.setattr(srv, "_ddg_results", lambda _query: [])
     status, _h, body = _post(base + "/api/search", {"query": "کلیپ آموزش پایتون رو پیدا کن"})
     data = json.loads(body)
     assert status == 200 and data["intent"]["kind"] == "video"
