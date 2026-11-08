@@ -1,15 +1,12 @@
-"""Google search providers for LocalChat.
+"""Legacy Google search provider adapters used by the multi-provider search engine.
 
-Google has no free, keyless, official search API:
-* Serper.dev returns real Google results as JSON (free signup credits, needs a key).
-* The Google Custom Search JSON API is closed to new customers and is
-  discontinued on 2027-01-01; it only works for people who already have a key + cx.
-* A keyless request to google.com/search is attempted as a last resort. Google now
-  usually answers non-JavaScript clients with a "enable JavaScript" page, so this
-  most often fails and the caller falls back to DuckDuckGo.
+Serper and Google Custom Search return structured JSON. The brittle keyless Google HTML
+parser remains for compatibility and focused parser tests, but the active search router
+does not rely on scraping Google result pages. Provider failures are isolated by
+local_chat.search_engine and never expose API keys in error messages.
 
-Every provider returns a list of {"title", "url", "snippet"} dicts or raises
-SearchProviderError (never leaking API keys in the message).
+Every provider returns a list of {"title", "url", "snippet"} dictionaries or raises
+SearchProviderError.
 """
 import json
 import re
