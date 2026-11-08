@@ -1229,7 +1229,7 @@ SEARCH_PROVIDER_LABELS = {
 @register_capability(
     id="web_search",
     name="جست‌وجوی وب",
-    description="جست‌وجوی هوشمند وب با گوگل (و پشتیبان DuckDuckGo) + پیدا کردن لینک فیلم، ویدیو، آهنگ و عکس؛ منابع بعد از پاسخ نمایش داده می‌شوند.",
+    description="جست‌وجوی چندموتورهٔ وب، کشف صفحهٔ محصول در فروشگاه‌های ایرانی، یافتن ویدیو در آپارات و سایت‌های دیگر، و جست‌وجوی رسانه؛ فقط پیوندهای برگشتی از منابع واقعی نمایش داده می‌شوند.",
     purpose="یافتن اطلاعات روزآمد و ارجاع به صفحه‌های وب عمومی.",
     activation_conditions=(
         "جست‌وجوی وب",
@@ -1260,6 +1260,13 @@ SEARCH_PROVIDER_LABELS = {
         "today",
         "فیلم پیدا کن",
         "آهنگ پیدا کن",
+        "کارت گرافیک",
+        "لینک محصول",
+        "خرید محصول",
+        "فروشگاه",
+        "gpu",
+        "product link",
+        "buy product",
         "عکس پیدا کن",
         "ویدیو پیدا کن",
         "لینک فیلم",
@@ -1270,10 +1277,10 @@ SEARCH_PROVIDER_LABELS = {
     ),
     inputs=("عبارت جست‌وجو",),
     outputs=("حداکثر پنج نتیجهٔ وب یا هشت لینک رسانه (ویدیو، آهنگ، فیلم، تصویر) با عنوان و پیوند",),
-    dependencies=("اتصال اینترنت", "کلید Serper یا Google CSE برای نتایج واقعی گوگل (اختیاری)", "DuckDuckGo به‌عنوان پشتیبان"),
+    dependencies=("اتصال اینترنت", "کلید Brave Search یا Serper برای پوشش بهتر (اختیاری)", "DuckDuckGo به‌عنوان مسیر بدون کلید"),
     limitations=(
-        "گوگل API رایگان و بدون کلید ندارد؛ بدون کلید معمولاً به DuckDuckGo برمی‌گردد.",
-        "Google Custom Search API از ۱ ژانویهٔ ۲۰۲۷ تعطیل می‌شود.",
+        "کیفیت و پوشش جست‌وجوی بدون کلید به محدودیت‌های موتورهای عمومی وابسته است؛ برای کیفیت بالاتر کلید Brave Search یا Serper توصیه می‌شود.",
+        "وجود نتیجه در موتور جست‌وجو تضمین‌کنندهٔ موجودی کالا، قیمت یا دسترسی دائمی به صفحه نیست.",
         "نتیجه‌ها ممکن است ناقص یا محدود شوند.",
         "برخی سایت‌ها اجازهٔ واکشی متن نمی‌دهند.",
         "محتوای وب ورودی غیرقابل‌اعتماد است.",
@@ -1281,18 +1288,29 @@ SEARCH_PROVIDER_LABELS = {
     documentation="web_search.md",
 )
 def _search_web(query):
-    """Smart search: media requests (video / music / movie / image) get real links from specialised
-    providers; everything else goes through the normal web search. Always returns the same dict shape
-    (`results` items may carry `kind`/`source`) plus `intent`."""
+    """Search real web pages and specialized media sources; never synthesize result URLs."""
     intent = search_intent.classify(query)
     public_intent = {"kind": intent["kind"], "topic": intent["topic"]}
     if intent["kind"] in ("image", "video", "music", "movie"):
         items = media_search.search_media(
             intent["kind"], intent["topic"], intent["lang"], intent.get("kind_word", ""),
-            web_fallback=_ddg_results)
+            web_fallback=None if intent["kind"] == "video" else _ddg_results)
+        if intent["kind"] == "video":
+            # Supplement YouTube with domain-targeted discovery for Aparat and other hosts.
+            web = _search_web_text(f"{intent['topic']} video")
+            merged = []
+            seen = set()
+            for item in list(items or []) + list(web.get("results") or []):
+                key = str(item.get("url") or "").split("#", 1)[0].rstrip("/")
+                if key and key not in seen:
+                    seen.add(key)
+                    merged.append(item)
+            web["results"] = merged[:8]
+            web["intent"] = public_intent
+            return web
         if items:
-            return {"results": items, "engine": "media", "provider": "media", "fallback": False,
-                    "notice": "", "intent": public_intent}
+            return {"results": items, "engine": "media", "provider": "specialized media sources",
+                    "fallback": False, "notice": "", "intent": public_intent}
     outcome = _search_web_text(search_intent.clean_query(query))
     outcome["intent"] = public_intent
     return outcome
