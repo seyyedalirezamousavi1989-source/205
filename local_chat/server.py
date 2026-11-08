@@ -43,7 +43,7 @@ if __package__:
     from . import settings as app_settings
     from . import files as attach_files
     from . import models_catalog
-    from . import search_providers, search_intent, media_search
+    from . import search_providers, search_intent, media_search, search_engine, search_engine
     from . import version as version_info
     from . import system_tools
     from . import coding_agent
@@ -1299,52 +1299,15 @@ def _search_web(query):
 
 
 def _search_web_text(query):
-    """Search with the engine chosen in settings. Returns a dict for the API.
-
-    Google order: Serper key → Google CSE key+cx → keyless Google page → DuckDuckGo.
-    Falling back is always reported so the interface can tell the user which
-    engine really produced the results.
-    """
-    global _KEYLESS_GOOGLE_BLOCKED_UNTIL
+    """Multi-provider search with intent-aware product/video domain expansion."""
     config = app_settings.search_settings()
-    if config["engine"] != "google":
-        results = _search_duckduckgo(query)
-        return {"results": results, "engine": "duckduckgo", "provider": "duckduckgo",
-                "fallback": False, "notice": ""}
-
-    providers = []
-    if config["serper_api_key"]:
-        providers.append(("serper", lambda: search_providers.search_serper(
-            query, config["serper_api_key"])))
-    if config["google_api_key"] and config["google_cx"]:
-        providers.append(("google_cse", lambda: search_providers.search_google_cse(
-            query, config["google_api_key"], config["google_cx"])))
-    has_key = bool(providers)
-    if time.monotonic() >= _KEYLESS_GOOGLE_BLOCKED_UNTIL:
-        providers.append(("google_web", lambda: search_providers.search_google_keyless(query)))
-
-    problems = []
-    for name, call in providers:
-        try:
-            results = call()
-        except search_providers.SearchProviderError as exc:
-            problems.append(f"{SEARCH_PROVIDER_LABELS[name]}: {exc}")
-            if name == "google_web":
-                _KEYLESS_GOOGLE_BLOCKED_UNTIL = time.monotonic() + 600
-            continue
-        if results:
-            return {"results": _attach_page_content(results), "engine": "google",
-                    "provider": name, "fallback": False, "notice": ""}
-        problems.append(f"{SEARCH_PROVIDER_LABELS[name]}: نتیجه‌ای پیدا نشد.")
-
-    results = _search_duckduckgo(query)
-    notice = "گوگل در دسترس نبود؛ از DuckDuckGo استفاده شد."
-    if has_key and problems:
-        notice += " " + problems[0]
-    elif not has_key:
-        notice += " برای نتیجه‌های واقعی گوگل در «تنظیمات» کلید Serper را وارد کن."
-    return {"results": results, "engine": "duckduckgo", "provider": "duckduckgo",
-            "fallback": True, "notice": notice}
+    try:
+        return search_engine.search(
+            query, config, _ddg_results, page_fetch=_fetch_public_page,
+            max_results=MAX_SEARCH_RESULTS,
+        )
+    except search_engine.SearchError as exc:
+        raise RuntimeError(str(exc)) from exc
 
 
 def _browse_for_folder():
