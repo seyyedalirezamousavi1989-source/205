@@ -144,12 +144,14 @@
       <h3 class="settings-heading">موتور جست‌وجوی وب</h3>
       <div class="settings-row">
         <select class="settings-input" id="searchEngine" dir="rtl">
-          <option value="google">Google (پیشنهادی)</option>
+          <option value="auto">خودکار (چند موتور)</option>
+          <option value="brave">Brave Search</option>
+          <option value="google">Google / Serper</option>
           <option value="duckduckgo">DuckDuckGo</option>
         </select>
       </div>
-      <p class="settings-note">گوگل API رایگانِ بدون کلید ندارد. برای نتایج واقعی گوگل یک کلید <b>Serper.dev</b> بگیر (اعتبار رایگان اولیه دارد) و اینجا بگذار. اگر از قبل کلید Google Custom Search و cx داری، آن هم کار می‌کند ولی آن API از ۱ ژانویهٔ ۲۰۲۷ تعطیل می‌شود. اگر هیچ‌کدام نبود، برنامه خودش به DuckDuckGo برمی‌گردد و اعلام می‌کند.</p>
-      <div class="settings-row"><input class="settings-input" id="serperKey" type="password" dir="ltr" placeholder="Serper API key" autocomplete="off"></div>
+      <p class="settings-note">حالت خودکار چند منبع را ترکیب می‌کند و برای محصول، جست‌وجوی هدفمند در فروشگاه‌های ایرانی انجام می‌دهد. برای کیفیت بهتر یک کلید Brave Search یا Serper وارد کن؛ بدون کلید از DuckDuckGo استفاده می‌شود و پوشش آن محدودتر است. کلیدها فقط روی همین رایانه ذخیره می‌شوند.</p>
+      <div class="settings-row"><input class="settings-input" id="serperKey" type="password" dir="ltr" placeholder="Serper API key" autocomplete="off"><input class="settings-input" id="braveKey" type="password" dir="ltr" placeholder="Brave Search API key (اختیاری)" autocomplete="off"></div>
       <div class="settings-row"><input class="settings-input" id="googleKey" type="password" dir="ltr" placeholder="Google API key (اختیاری)" autocomplete="off"><input class="settings-input" id="googleCx" type="text" dir="ltr" placeholder="cx (اختیاری)" autocomplete="off"></div>
       <div class="settings-actions"><button class="settings-button primary" id="saveSearch" type="button">ذخیرهٔ تنظیمات جست‌وجو</button><button class="settings-button danger" id="clearSearchKeys" type="button">پاک کردن کلیدها</button></div>
       <div class="settings-status" id="searchStatus"></div>
