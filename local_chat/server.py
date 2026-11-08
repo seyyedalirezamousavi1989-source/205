@@ -1306,6 +1306,10 @@ def _search_web(query):
                 if key and key not in seen:
                     seen.add(key)
                     merged.append(item)
+            merged.sort(key=lambda item: (
+                0 if "aparat.com" in (urlsplit(item.get("url", "")).hostname or "").lower() else 1,
+                -float(item.get("match_score") or 0),
+            ))
             web["results"] = merged[:8]
             if items and not web_items:
                 web["engine"] = "media"
