@@ -213,7 +213,7 @@ def _run_query(calls):
     errors = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(calls) or 1)) as pool:
         future_map = {pool.submit(call): name for name, call in calls}
-        for future in concurrent.futures.as_completed(future_map, timeout=TIMEOUT + 2):
+        for future in concurrent.futures.as_completed(future_map):
             name = future_map[future]
             try:
                 rows = future.result() or []
@@ -252,22 +252,21 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
     targeted_provider = next((name for name in ("Google / Serper", "Brave Search", "Google CSE", "DuckDuckGo")
                               if any(row_provider == name for row_provider, _ in base_rows)), "DuckDuckGo")
     provider_map = dict(base_calls)
-    targeted_call = provider_map.get(targeted_provider)
-    if targeted_call and len(query_plan) > 1:
+    if len(query_plan) > 1:
+        targeted_calls = []
         for targeted_query in query_plan[1:]:
-            try:
-                if targeted_provider == "Google / Serper":
-                    rows = search_providers.search_serper(targeted_query, config["serper_api_key"])
-                elif targeted_provider == "Brave Search":
-                    rows = search_brave(targeted_query, config["brave_api_key"])
-                elif targeted_provider == "Google CSE":
-                    rows = search_providers.search_google_cse(
-                        targeted_query, config["google_api_key"], config["google_cx"])
-                else:
-                    rows = ddg_search(targeted_query)
-                all_rows.extend((targeted_provider, row) for row in rows or [])
-            except Exception as exc:
-                errors.append(f"{targeted_provider} (site): {str(exc)[:140]}")
+            def call_targeted(q=targeted_query, provider=targeted_provider):
+                if provider == "Google / Serper":
+                    return search_providers.search_serper(q, config["serper_api_key"])
+                if provider == "Brave Search":
+                    return search_brave(q, config["brave_api_key"])
+                if provider == "Google CSE":
+                    return search_providers.search_google_cse(q, config["google_api_key"], config["google_cx"])
+                return ddg_search(q)
+            targeted_calls.append((targeted_provider, call_targeted))
+        targeted_rows, targeted_errors = _run_query(targeted_calls)
+        all_rows.extend(targeted_rows)
+        errors.extend(targeted_errors)
 
     normalized = []
     for provider, row in all_rows:
