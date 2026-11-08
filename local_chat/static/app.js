@@ -863,7 +863,7 @@ function searchQueryFrom(text) {
 
 function setSearchEngineLabel(engine) {
   if (!engine) return;
-  searchProviderLabel.textContent = engine === "google" ? "Google" : "DuckDuckGo";
+  searchProviderLabel.textContent = ({ auto: "چندموتوره", google: "Google", brave: "Brave", duckduckgo: "DuckDuckGo", multi: "چندمنبعی", media: "رسانه" })[engine] || engine;
 }
 
 const MEDIA_WORD = /(?:فیلم|سریال|انیمه|انیمیشن|آهنگ|اهنگ|موزیک|موسیقی|ترانه|آلبوم|عکس|تصویر|پوستر|والپیپر|ویدیو|ویدئو|کلیپ|تریلر|یوتیوب|\b(?:movie|film|series|song|music|album|image|photo|picture|wallpaper|poster|video|clip|trailer|youtube)\b)/i;
