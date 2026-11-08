@@ -68,7 +68,7 @@ a = Analysis(
     hiddenimports=[
         *mt5_hiddenimports,
         *edge_hiddenimports,
-        "local_chat.version", "local_chat.search_intent", "local_chat.media_search",
+        "local_chat.version", "local_chat.search_intent", "local_chat.media_search", "local_chat.search_engine",
         "numpy", "numpy.core", "numpy.core.multiarray", "numpy.core._multiarray_umath",
         "local_chat.mt5_data", "local_chat.mt5_trade",
         "local_chat.server", "local_chat.capabilities", "local_chat.memory",
