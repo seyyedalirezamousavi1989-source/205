@@ -77,7 +77,7 @@ MAX_BODY_SIZE = 2 * 1024 * 1024
 # namespaced models («user/model:tag», «hf.co/…») are valid Ollama names too
 MODEL_PATTERN = re.compile(r"^(?!.*\.\.)(?!.*//)[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$")
 MAX_SEARCH_QUERY_LENGTH = 500
-MAX_SEARCH_RESULTS = 5
+MAX_SEARCH_RESULTS = 8
 MAX_PAGE_BYTES = 1_000_000
 MAX_PAGE_TEXT = 3000
 APP_VERSION = version_info.APP_VERSION
@@ -1276,7 +1276,7 @@ SEARCH_PROVIDER_LABELS = {
         "find an image",
     ),
     inputs=("عبارت جست‌وجو",),
-    outputs=("حداکثر پنج نتیجهٔ وب یا هشت لینک رسانه (ویدیو، آهنگ، فیلم، تصویر) با عنوان و پیوند",),
+    outputs=("حداکثر هشت نتیجهٔ وب یا رسانه با عنوان، دامنه، نوع پیوند و نشانی واقعی",),
     dependencies=("اتصال اینترنت", "کلید Brave Search یا Serper برای پوشش بهتر (اختیاری)", "DuckDuckGo به‌عنوان مسیر بدون کلید"),
     limitations=(
         "کیفیت و پوشش جست‌وجوی بدون کلید به محدودیت‌های موتورهای عمومی وابسته است؛ برای کیفیت بالاتر کلید Brave Search یا Serper توصیه می‌شود.",
