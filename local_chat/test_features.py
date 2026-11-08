@@ -658,8 +658,8 @@ class SearchTests(FeatureTestCase):
         mock_open.side_effect = HTTPError("u", 403, "forbidden", {}, None)
         data = json.loads(self.call("POST", "/api/search", {"query": "x"})[1])
         self.assertEqual((data["engine"], data["fallback"]), ("DuckDuckGo", True))
-        self.assertIn("DuckDuckGo", data["notice"])
-        self.assertIn("کلید", data["notice"])
+        self.assertEqual(data["provider"], "DuckDuckGo")
+        self.assertTrue(data["errors"])
         self.assertNotIn("abcd1234efgh5678", json.dumps(data))
         # the failed keyless attempt is remembered, so the next search does not retry it for a while
         calls = mock_open.call_count
