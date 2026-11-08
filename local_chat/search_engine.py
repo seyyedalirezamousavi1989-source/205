@@ -183,13 +183,15 @@ def search_brave(query, api_key, limit=8):
 
 def _provider_calls(query, config, ddg_search):
     calls = []
-    if config.get("serper_api_key"):
-        calls.append(("Google / Serper", lambda q=query: search_providers.search_serper(q, config["serper_api_key"])))
-    if config.get("brave_api_key"):
+    engine = config.get("engine", "auto")
+    if engine in ("auto", "google"):
+        if config.get("serper_api_key"):
+            calls.append(("Google / Serper", lambda q=query: search_providers.search_serper(q, config["serper_api_key"])))
+        if config.get("google_api_key") and config.get("google_cx"):
+            calls.append(("Google CSE", lambda q=query: search_providers.search_google_cse(
+                q, config["google_api_key"], config["google_cx"])))
+    if engine in ("auto", "brave") and config.get("brave_api_key"):
         calls.append(("Brave Search", lambda q=query: search_brave(q, config["brave_api_key"])))
-    if config.get("google_api_key") and config.get("google_cx"):
-        calls.append(("Google CSE", lambda q=query: search_providers.search_google_cse(
-            q, config["google_api_key"], config["google_cx"])))
     calls.append(("DuckDuckGo", lambda q=query: ddg_search(q)))
     return calls
 
@@ -252,8 +254,6 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
     provider_map = dict(base_calls)
     targeted_call = provider_map.get(targeted_provider)
     if targeted_call and len(query_plan) > 1:
-        targeted_calls = [(f"{targeted_provider} (site)", lambda q=q: provider_map[targeted_provider].__closure__[0].cell_contents(q))
-                          for q in []]  # kept empty; calls below use explicit safe dispatch
         for targeted_query in query_plan[1:]:
             try:
                 if targeted_provider == "Google / Serper":
