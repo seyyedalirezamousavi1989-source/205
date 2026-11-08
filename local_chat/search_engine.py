@@ -28,7 +28,7 @@ _CACHE_LIMIT = 96
 
 _PRODUCT = re.compile(
     r"(?:کارت\s*گرافیک|گرافیک|پردازنده|سی\s*پی\s*یو|مادربرد|رم|حافظه|اس\s*اس\s*دی|"
-    r"مانیتور|لپ\s*تاپ|موس|کیبورد|پاور|کیس|خرید|قیمت|product|buy|price|gpu|cpu|"
+    r"مانیتور|لپ\s*تاپ|موس|کیبورد|پاور|کیس|محصول|product|gpu|cpu|"
     r"rtx\s*\d{3,4}|gtx\s*\d{3,4}|rx\s*\d{3,4})", re.I
 )
 _VIDEO = re.compile(r"(?:آپارات|ویدیو|ویدئو|کلیپ|فیلم|تریلر|aparat|youtube|video|watch)", re.I)
