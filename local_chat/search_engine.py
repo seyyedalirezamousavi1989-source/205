@@ -21,7 +21,7 @@ USER_AGENT = (
 )
 TIMEOUT = 12
 MAX_RESULTS = 8
-MAX_QUERIES = 5
+MAX_QUERIES = 6
 MAX_BYTES = 2 * 1024 * 1024
 CACHE_TTL = 180
 _CACHE = {}
@@ -40,8 +40,6 @@ _IRAN_STORES = (
     "emalls.ir",
     "technolife.ir",
     "lioncomputer.com",
-    "meghdadit.com",
-    "shahrcomputer.com",
 )
 _VIDEO_SITES = ("aparat.com/v", "youtube.com/watch", "namasha.com", "tamasha.com")
 
