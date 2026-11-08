@@ -115,11 +115,12 @@ def ollama_environment():
 
 # --- web search -------------------------------------------------------------------
 
-SEARCH_ENGINES = ("google", "duckduckgo")
+SEARCH_ENGINES = ("auto", "google", "brave", "duckduckgo")
 _KEY_PATTERN = re.compile(r"^[A-Za-z0-9_\-.]{8,200}$")
 _CX_PATTERN = re.compile(r"^[A-Za-z0-9:_\-.]{3,120}$")
 SEARCH_KEY_FIELDS = {
     "serper_api_key": _KEY_PATTERN,
+    "brave_api_key": _KEY_PATTERN,
     "google_api_key": _KEY_PATTERN,
     "google_cx": _CX_PATTERN,
 }
@@ -130,7 +131,7 @@ def search_settings():
     data = load_settings().get("search", {})
     data = data if isinstance(data, dict) else {}
     engine = data.get("engine")
-    result = {"engine": engine if engine in SEARCH_ENGINES else "google"}
+    result = {"engine": engine if engine in SEARCH_ENGINES else "auto"}
     for field in SEARCH_KEY_FIELDS:
         value = data.get(field)
         result[field] = value.strip() if isinstance(value, str) else ""
@@ -147,6 +148,8 @@ def search_settings_public():
     return {
         "engine": full["engine"],
         "has_serper_key": bool(full["serper_api_key"]),
+        "has_brave_key": bool(full["brave_api_key"]),
+        "brave_hint": _hint(full["brave_api_key"]),
         "serper_hint": _hint(full["serper_api_key"]),
         "has_google_cse": bool(full["google_api_key"] and full["google_cx"]),
         "google_api_hint": _hint(full["google_api_key"]),
