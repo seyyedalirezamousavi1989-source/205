@@ -1298,14 +1298,25 @@ def _search_web(query):
         if intent["kind"] == "video":
             # Supplement YouTube with domain-targeted discovery for Aparat and other hosts.
             web = _search_web_text(f"{intent['topic']} video")
+            web_items = list(web.get("results") or [])
             merged = []
             seen = set()
-            for item in list(items or []) + list(web.get("results") or []):
+            for item in list(items or []) + web_items:
                 key = str(item.get("url") or "").split("#", 1)[0].rstrip("/")
                 if key and key not in seen:
                     seen.add(key)
                     merged.append(item)
             web["results"] = merged[:8]
+            if items and not web_items:
+                web["engine"] = "media"
+                web["provider"] = "YouTube"
+                web["fallback"] = False
+            elif items:
+                web["engine"] = "multi"
+                providers = [str(item.get("source") or "YouTube") for item in items]
+                if web.get("provider"):
+                    providers.append(str(web["provider"]))
+                web["provider"] = ", ".join(dict.fromkeys(providers))
             web["intent"] = public_intent
             return web
         if items:
