@@ -466,10 +466,11 @@ function renderSources(article, sources) {
     link.rel = "noopener noreferrer";
     link.title = [source.title, source.snippet, source.url].filter(Boolean).join("\n");
     if (info) link.className = `media-link media-${source.kind}`;
-    const host = source.source || hostOf(source.url);
+    const host = hostOf(source.url);
+    const typeLabel = source.link_type === "product" ? "صفحه محصول" : source.link_type === "video" ? "ویدیو" : "";
     link.textContent = info
       ? `${info.icon} ${source.title || source.url}${host ? " · " + host : ""}`
-      : `[${index + 1}] ${source.title || source.url}`;
+      : `[${index + 1}] ${source.title || source.url}${host ? " · " + host : ""}${typeLabel ? " · " + typeLabel : ""}`;
     container.append(link);
   });
   const anchor = article.querySelector(".continue-button");
