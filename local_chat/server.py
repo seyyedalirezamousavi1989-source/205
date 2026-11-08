@@ -1311,6 +1311,7 @@ def _search_web(query):
                 web["engine"] = "media"
                 web["provider"] = "YouTube"
                 web["fallback"] = False
+                web["notice"] = ""
             elif items:
                 web["engine"] = "multi"
                 providers = [str(item.get("source") or "YouTube") for item in items]
