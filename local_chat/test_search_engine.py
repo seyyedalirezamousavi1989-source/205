@@ -17,6 +17,7 @@ def test_search_intent_and_domain_query_plans():
 def test_normalizer_only_accepts_real_http_links_and_marks_product_pages():
     assert search_engine._normalize_item({"title": "GPU", "url": "javascript:alert(1)"}, "fake", "GPU", "product") is None
     assert search_engine._normalize_item({"title": "GPU", "url": "https://user:pass@example.com/x"}, "fake", "GPU", "product") is None
+    assert search_engine._normalize_item({"title": "local", "url": "http://127.0.0.1/admin"}, "fake", "GPU", "product") is None
     item = search_engine._normalize_item(
         {"title": "کارت گرافیک RTX 3060", "url": "https://www.digikala.com/product/dkp-123/"},
         "DuckDuckGo", "کارت گرافیک RTX 3060", "product")
