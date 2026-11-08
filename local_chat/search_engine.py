@@ -190,7 +190,7 @@ def _provider_calls(query, config, ddg_search):
         if config.get("google_api_key") and config.get("google_cx"):
             calls.append(("Google CSE", lambda q=query: search_providers.search_google_cse(
                 q, config["google_api_key"], config["google_cx"])))
-    if engine in ("auto", "brave") and config.get("brave_api_key"):
+    if engine in ("auto", "google", "brave") and config.get("brave_api_key"):
         calls.append(("Brave Search", lambda q=query: search_brave(q, config["brave_api_key"])))
     calls.append(("DuckDuckGo", lambda q=query: ddg_search(q)))
     return calls
