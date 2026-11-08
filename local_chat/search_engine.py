@@ -5,6 +5,7 @@ deduplicates, ranks and labels them. Product and video searches expand into doma
 queries, especially for Persian/Iranian commerce and Aparat.
 """
 import concurrent.futures
+import ipaddress
 import json
 import re
 import time
@@ -65,12 +66,22 @@ def classify(query):
 
 def _safe_url(value):
     try:
-        p = urlsplit(str(value or ""))
-        return (
-            p.scheme in ("http", "https") and bool(p.hostname)
-            and p.username is None and p.password is None
-            and len(str(value)) <= 2048
-        )
+        raw = str(value or "")
+        p = urlsplit(raw)
+        host = (p.hostname or "").lower().rstrip(".")
+        if p.scheme not in ("http", "https") or not host or len(raw) > 2048:
+            return False
+        if p.username is not None or p.password is not None:
+            return False
+        if host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
+            return False
+        try:
+            address = ipaddress.ip_address(host)
+            if not address.is_global:
+                return False
+        except ValueError:
+            pass
+        return True
     except ValueError:
         return False
 
