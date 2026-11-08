@@ -310,6 +310,9 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
         "errors": errors[:4],
         "cached": False,
     }
+    if errors:
+        payload["fallback"] = True
+        payload["notice"] += " خطاهای منابع: " + "؛ ".join(errors[:2])
     if len(_CACHE) >= _CACHE_LIMIT:
         _CACHE.pop(next(iter(_CACHE)), None)
     _CACHE[cache_key] = (time.monotonic(), payload)
