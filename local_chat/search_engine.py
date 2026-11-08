@@ -239,8 +239,7 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
     if not query:
         raise SearchError("عبارت جست‌وجو خالی است.")
     kind = classify(query)
-    cache_key = (query.casefold(), kind, config.get("engine", "auto"), bool(config.get("serper_api_key")),
-                 bool(config.get("brave_api_key")), bool(config.get("google_api_key")))
+    cache_key = (query.casefold(), kind, config.get("engine", "auto"), str(config.get("serper_api_key") or "")[-4:], str(config.get("brave_api_key") or "")[-4:], str(config.get("google_api_key") or "")[-4:], str(config.get("google_cx") or ""))
     cached = _CACHE.get(cache_key)
     if cached and time.monotonic() - cached[0] < CACHE_TTL:
         payload = dict(cached[1])
