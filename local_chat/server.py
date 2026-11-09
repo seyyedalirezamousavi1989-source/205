@@ -43,7 +43,7 @@ if __package__:
     from . import settings as app_settings
     from . import files as attach_files
     from . import models_catalog
-    from . import search_providers, search_intent, media_search
+    from . import search_providers, search_intent, media_search, search_engine, search_plan
     from . import version as version_info
     from . import system_tools
     from . import coding_agent
@@ -61,7 +61,7 @@ else:
     import settings as app_settings
     import files as attach_files
     import models_catalog
-    import search_providers, search_intent, media_search
+    import search_providers, search_intent, media_search, search_engine, search_plan
     import version as version_info
     import system_tools
     import coding_agent
@@ -77,7 +77,7 @@ MAX_BODY_SIZE = 2 * 1024 * 1024
 # namespaced models («user/model:tag», «hf.co/…») are valid Ollama names too
 MODEL_PATTERN = re.compile(r"^(?!.*\.\.)(?!.*//)[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$")
 MAX_SEARCH_QUERY_LENGTH = 500
-MAX_SEARCH_RESULTS = 5
+MAX_SEARCH_RESULTS = 12
 MAX_PAGE_BYTES = 1_000_000
 MAX_PAGE_TEXT = 3000
 APP_VERSION = version_info.APP_VERSION
@@ -1229,7 +1229,7 @@ SEARCH_PROVIDER_LABELS = {
 @register_capability(
     id="web_search",
     name="جست‌وجوی وب",
-    description="جست‌وجوی هوشمند وب با گوگل (و پشتیبان DuckDuckGo) + پیدا کردن لینک فیلم، ویدیو، آهنگ و عکس؛ منابع بعد از پاسخ نمایش داده می‌شوند.",
+    description="جست‌وجوی تطبیقی و رایگان‌محور در وب، سایت‌های ایرانی، محصولات، فایل‌ها و رسانه؛ فیلترهای زبان و دامنه از متن طبیعی مکالمه استخراج می‌شوند و فقط پیوندهای واقعی نمایش داده می‌شوند.",
     purpose="یافتن اطلاعات روزآمد و ارجاع به صفحه‌های وب عمومی.",
     activation_conditions=(
         "جست‌وجوی وب",
@@ -1260,6 +1260,18 @@ SEARCH_PROVIDER_LABELS = {
         "today",
         "فیلم پیدا کن",
         "آهنگ پیدا کن",
+        "کارت گرافیک",
+        "لینک محصول",
+        "خرید محصول",
+        "فایل پیدا کن",
+        "فایل PDF",
+        "فقط سایت فارسی",
+        "فقط سایت",
+        "فقط منابع فارسی",
+        "فروشگاه",
+        "gpu",
+        "product link",
+        "buy product",
         "عکس پیدا کن",
         "ویدیو پیدا کن",
         "لینک فیلم",
@@ -1269,82 +1281,83 @@ SEARCH_PROVIDER_LABELS = {
         "find an image",
     ),
     inputs=("عبارت جست‌وجو",),
-    outputs=("حداکثر پنج نتیجهٔ وب یا هشت لینک رسانه (ویدیو، آهنگ، فیلم، تصویر) با عنوان و پیوند",),
-    dependencies=("اتصال اینترنت", "کلید Serper یا Google CSE برای نتایج واقعی گوگل (اختیاری)", "DuckDuckGo به‌عنوان پشتیبان"),
+    outputs=("حداکثر دوازده نتیجهٔ وب، محصول، فایل یا رسانه با عنوان، دامنه، نوع پیوند و نشانی واقعی",),
+    dependencies=("اتصال اینترنت", "DuckDuckGo و Bing RSS بدون کلید", "SearXNG اختیاری", "APIهای کلیددار فقط به‌عنوان مسیر پشتیبان"),
     limitations=(
-        "گوگل API رایگان و بدون کلید ندارد؛ بدون کلید معمولاً به DuckDuckGo برمی‌گردد.",
-        "Google Custom Search API از ۱ ژانویهٔ ۲۰۲۷ تعطیل می‌شود.",
+        "هیچ منبع رایگان پوشش کامل اینترنت را تضمین نمی‌کند؛ APIهای کلیددار فقط پس از ناکافی بودن نتایج رایگان فعال می‌شوند.",
+        "وجود نتیجه در موتور جست‌وجو تضمین‌کنندهٔ موجودی کالا، قیمت یا دسترسی دائمی به صفحه نیست.",
         "نتیجه‌ها ممکن است ناقص یا محدود شوند.",
         "برخی سایت‌ها اجازهٔ واکشی متن نمی‌دهند.",
         "محتوای وب ورودی غیرقابل‌اعتماد است.",
     ),
     documentation="web_search.md",
 )
-def _search_web(query):
-    """Smart search: media requests (video / music / movie / image) get real links from specialised
-    providers; everything else goes through the normal web search. Always returns the same dict shape
-    (`results` items may carry `kind`/`source`) plus `intent`."""
+def _search_web(query, search_options=None):
+    """Search real web pages and specialized media sources; never synthesize result URLs."""
     intent = search_intent.classify(query)
     public_intent = {"kind": intent["kind"], "topic": intent["topic"]}
+    parsed = search_plan.parse_search_request(query, search_options)
+    constraints = parsed["constraints"]
+    has_constraints = bool(
+        parsed.get("strict_domains") or constraints.get("language") or constraints.get("region")
+        or constraints.get("allowed_domains") or constraints.get("excluded_domains")
+        or constraints.get("content_types") or constraints.get("file_search")
+    )
+    # Explicit user constraints take precedence over specialized media shortcuts.
+    if has_constraints:
+        outcome = _search_web_text(query, search_options=search_options)
+        outcome["intent"] = public_intent
+        return outcome
     if intent["kind"] in ("image", "video", "music", "movie"):
         items = media_search.search_media(
             intent["kind"], intent["topic"], intent["lang"], intent.get("kind_word", ""),
-            web_fallback=_ddg_results)
+            web_fallback=None if intent["kind"] == "video" else _ddg_results)
+        if intent["kind"] == "video":
+            web = _search_web_text(f"{intent['topic']} video")
+            web_items = list(web.get("results") or [])
+            merged = []
+            seen = set()
+            for item in list(items or []) + web_items:
+                key = str(item.get("url") or "").split("#", 1)[0].rstrip("/")
+                if key and key not in seen:
+                    seen.add(key)
+                    merged.append(item)
+            merged.sort(key=lambda item: (
+                0 if "aparat.com" in (urlsplit(item.get("url", "")).hostname or "").lower() else 1,
+                -float(item.get("match_score") or 0),
+            ))
+            web["results"] = merged[:8]
+            if items and not web_items:
+                web["engine"] = "media"
+                web["provider"] = "YouTube"
+                web["fallback"] = False
+                web["notice"] = ""
+            elif items:
+                web["engine"] = "multi"
+                providers = [str(item.get("source") or "YouTube") for item in items]
+                if web.get("provider"):
+                    providers.append(str(web["provider"]))
+                web["provider"] = ", ".join(dict.fromkeys(providers))
+            web["intent"] = public_intent
+            return web
         if items:
-            return {"results": items, "engine": "media", "provider": "media", "fallback": False,
-                    "notice": "", "intent": public_intent}
+            return {"results": items, "engine": "media", "provider": "specialized media sources",
+                    "fallback": False, "notice": "", "intent": public_intent}
     outcome = _search_web_text(search_intent.clean_query(query))
     outcome["intent"] = public_intent
     return outcome
 
 
-def _search_web_text(query):
-    """Search with the engine chosen in settings. Returns a dict for the API.
-
-    Google order: Serper key → Google CSE key+cx → keyless Google page → DuckDuckGo.
-    Falling back is always reported so the interface can tell the user which
-    engine really produced the results.
-    """
-    global _KEYLESS_GOOGLE_BLOCKED_UNTIL
+def _search_web_text(query, search_options=None):
+    """Adaptive multi-provider search with conversational constraints."""
     config = app_settings.search_settings()
-    if config["engine"] != "google":
-        results = _search_duckduckgo(query)
-        return {"results": results, "engine": "duckduckgo", "provider": "duckduckgo",
-                "fallback": False, "notice": ""}
-
-    providers = []
-    if config["serper_api_key"]:
-        providers.append(("serper", lambda: search_providers.search_serper(
-            query, config["serper_api_key"])))
-    if config["google_api_key"] and config["google_cx"]:
-        providers.append(("google_cse", lambda: search_providers.search_google_cse(
-            query, config["google_api_key"], config["google_cx"])))
-    has_key = bool(providers)
-    if time.monotonic() >= _KEYLESS_GOOGLE_BLOCKED_UNTIL:
-        providers.append(("google_web", lambda: search_providers.search_google_keyless(query)))
-
-    problems = []
-    for name, call in providers:
-        try:
-            results = call()
-        except search_providers.SearchProviderError as exc:
-            problems.append(f"{SEARCH_PROVIDER_LABELS[name]}: {exc}")
-            if name == "google_web":
-                _KEYLESS_GOOGLE_BLOCKED_UNTIL = time.monotonic() + 600
-            continue
-        if results:
-            return {"results": _attach_page_content(results), "engine": "google",
-                    "provider": name, "fallback": False, "notice": ""}
-        problems.append(f"{SEARCH_PROVIDER_LABELS[name]}: نتیجه‌ای پیدا نشد.")
-
-    results = _search_duckduckgo(query)
-    notice = "گوگل در دسترس نبود؛ از DuckDuckGo استفاده شد."
-    if has_key and problems:
-        notice += " " + problems[0]
-    elif not has_key:
-        notice += " برای نتیجه‌های واقعی گوگل در «تنظیمات» کلید Serper را وارد کن."
-    return {"results": results, "engine": "duckduckgo", "provider": "duckduckgo",
-            "fallback": True, "notice": notice}
+    try:
+        return search_engine.search(
+            query, config, _ddg_results, page_fetch=_fetch_public_page,
+            max_results=MAX_SEARCH_RESULTS, search_options=search_options,
+        )
+    except search_engine.SearchError as exc:
+        raise RuntimeError(str(exc)) from exc
 
 
 def _browse_for_folder():
@@ -2798,13 +2811,17 @@ class ChatHandler(BaseHTTPRequestHandler):
         ):
             self._send_json(400, {"error": "عبارت جست‌وجو خالی یا بیش از حد طولانی است."})
             return
-
+        search_options = payload.get("search_options")
+        if search_options is not None and not isinstance(search_options, dict):
+            self._send_json(400, {"error": "محدودیت‌های جست‌وجو باید یک شیء معتبر باشند."})
+            return
         try:
-            outcome = _search_web(query.strip())
+            outcome = _search_web(query.strip(), search_options=search_options)
         except RuntimeError as exc:
             self._send_json(502, {"error": str(exc)})
             return
         self._send_json(200, outcome)
+
 
     def do_POST(self):
         if not self._request_allowed(mutating=True):

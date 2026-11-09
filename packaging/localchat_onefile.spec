@@ -53,7 +53,7 @@ except Exception:
 
 
 a = Analysis(
-    [os.path.join(ROOT, "localchat_app.py")],
+    [os.path.join(ROOT, "local_chat", "launcher.py")],
     pathex=[ROOT],
     datas=[
         *edge_datas,
@@ -68,11 +68,22 @@ a = Analysis(
     hiddenimports=[
         *mt5_hiddenimports,
         *edge_hiddenimports,
-        "local_chat.version", "local_chat.search_intent", "local_chat.media_search",
         "numpy", "numpy.core", "numpy.core.multiarray", "numpy.core._multiarray_umath",
-        "local_chat.mt5_data", "local_chat.mt5_trade",
+        "local_chat.version", "local_chat.search_intent", "local_chat.media_search",
+        "local_chat.search_engine", "local_chat.search_plan", "local_chat.search_providers",
         "local_chat.server", "local_chat.capabilities", "local_chat.memory",
-        "local_chat.settings", "local_chat.launcher", "local_chat.files", "local_chat.models_catalog", "local_chat.search_providers", "pypdf", "webview", "webview.platforms.edgechromium", "clr", "tkinter", "tkinter.filedialog",
+        "local_chat.persian_speech", "local_chat.settings", "local_chat.launcher",
+        "local_chat.files", "local_chat.models_catalog", "local_chat.system_tools",
+        "local_chat.coding_agent", "local_chat.context_manager",
+        "local_chat.forex_service", "local_chat.forex_desk", "local_chat.forex_analysis",
+        "local_chat.forex_intent", "local_chat.forex_chart", "local_chat.forex_decision",
+        "local_chat.forex_prob", "local_chat.forex_news", "local_chat.forex_backtest",
+        "local_chat.forex_agent", "local_chat.forex_watch", "local_chat.forex_validate",
+        "local_chat.forex_vision", "local_chat.mt5_data", "local_chat.mt5_trade",
+        "local_chat.docker_runtime", "local_chat.project_analysis", "local_chat.procutil",
+        "local_chat.toolchains", "local_chat.toolfinder",
+        "pypdf", "webview", "webview.platforms.edgechromium", "clr",
+        "tkinter", "tkinter.filedialog", "PIL", "PIL.ImageGrab",
     ],
     excludes=["pytest", "unittest.mock", "pandas", "matplotlib"],
 )

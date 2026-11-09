@@ -466,10 +466,13 @@ function renderSources(article, sources) {
     link.rel = "noopener noreferrer";
     link.title = [source.title, source.snippet, source.url].filter(Boolean).join("\n");
     if (info) link.className = `media-link media-${source.kind}`;
-    const host = source.source || hostOf(source.url);
+    const host = hostOf(source.url);
+    const typeLabel = source.link_type === "product" ? "صفحه محصول" : source.link_type === "video" ? "ویدیو" : source.link_type === "file" ? `فایل${source.file_type ? " · " + source.file_type.toUpperCase() : ""}` : "";
+    const languageLabel = source.language_verified === false ? "زبان تأییدنشده" : "";
+    const detailLabel = [typeLabel, languageLabel].filter(Boolean).join(" · ");
     link.textContent = info
       ? `${info.icon} ${source.title || source.url}${host ? " · " + host : ""}`
-      : `[${index + 1}] ${source.title || source.url}`;
+      : `[${index + 1}] ${source.title || source.url}${host ? " · " + host : ""}${detailLabel ? " · " + detailLabel : ""}`;
     container.append(link);
   });
   const anchor = article.querySelector(".continue-button");
@@ -853,17 +856,17 @@ async function searchWeb(query, signal) {
 }
 
 function searchQueryFrom(text) {
-  // the server rejects queries over 500 characters: send a short single-line query instead
+  // Preserve natural-language filters while staying within the server limit.
   const flat = text.replace(/\s+/g, " ").trim();
-  if (flat.length <= 300) return flat;
-  const cut = flat.slice(0, 300);
+  if (flat.length <= 500) return flat;
+  const cut = flat.slice(0, 500);
   const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("؟"), cut.lastIndexOf("?"), cut.lastIndexOf(" "));
   return (end > 80 ? cut.slice(0, end) : cut).trim();
 }
 
 function setSearchEngineLabel(engine) {
   if (!engine) return;
-  searchProviderLabel.textContent = engine === "google" ? "Google" : "DuckDuckGo";
+  searchProviderLabel.textContent = ({ auto: "چندموتوره", google: "Google", brave: "Brave", duckduckgo: "DuckDuckGo", searxng: "SearXNG", multi: "چندمنبعی", media: "رسانه" })[engine] || engine;
 }
 
 const MEDIA_WORD = /(?:فیلم|سریال|انیمه|انیمیشن|آهنگ|اهنگ|موزیک|موسیقی|ترانه|آلبوم|عکس|تصویر|پوستر|والپیپر|ویدیو|ویدئو|کلیپ|تریلر|یوتیوب|\b(?:movie|film|series|song|music|album|image|photo|picture|wallpaper|poster|video|clip|trailer|youtube)\b)/i;
@@ -874,6 +877,9 @@ function wantsMediaSearch(query) {
 
 function shouldAutoSearchWeb(query) {
   if (wantsMediaSearch(query)) return true;
+  if (/(?:سرچ\s*کن|جست[\u200c\s]*و[\u200c\s]*جو\s*کن|بگرد|پیدا\s*کن|بیاب|بیار|لیست\s*کن|لینک\s*(?:بده|بیار)|در\s+اینترنت\s+بگرد|توی\s+اینترنت\s+بگرد|وب\s+را\s+بگرد|search\s+(?:the\s+web|for)|find\s+(?:me\s+)?)/i.test(query)) return true;
+  if (/(?:قیمت|موجودی|خرید)\s+.{2,}|(?:قیمت|موجودی)\s*(?:گوشی|کارت\s*گرافیک|لپ\s*تاپ|تبلت|هدفون|دوربین|کنسول|تلویزیون)|\b(?:rtx|gtx|iphone|ipad|macbook|galaxy|ps5|xbox)\b/i.test(query)) return true;
+  if (/(?:فایل|اسناد?|مدارک|\bpdf\b|\bdocx?\b|\bxlsx?\b|\bpptx?\b|\bzip\b).*(?:پیدا|جستجو|سرچ|دانلود|لینک)|(?:پیدا|جستجو|سرچ|دانلود|لینک).*(?:فایل|اسناد?|مدارک|\bpdf\b|\bdocx?\b|\bxlsx?\b|\bpptx?\b|\bzip\b)/i.test(query)) return true;
   return /(?:آخرین\s+(?:خبر|اخبار|قیمت|نسخه)|جدیدترین|امروز|امشب|اکنون|در حال حاضر|قیمت روز|نرخ ارز|قیمت فعلی|آب\s*و\s*هوا|وضعیت فعلی|اخبار|خبرهای\s+(?:امروز|جدید|روز)|نتایج زنده|latest|current|today|tonight|weather|live score|exchange rate)/i.test(query);
 }
 

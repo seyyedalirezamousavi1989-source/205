@@ -1,5 +1,7 @@
 import ctypes
 import json
+import os
+import traceback
 import shutil
 import socket
 import subprocess
@@ -11,12 +13,15 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 
-try:
-    from . import settings as app_settings
-    from .version import APP_VERSION
-except ImportError:  # run as a plain script
-    import settings as app_settings
-    from version import APP_VERSION
+# PyInstaller executes the entry script as __main__, so it has no package
+# context and relative imports fail. Add the project/bundle root explicitly,
+# then always import through the real local_chat package.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from local_chat import settings as app_settings
+from local_chat.version import APP_VERSION
 
 APP_DIR = Path(__file__).resolve().parent
 SERVER_FILE = APP_DIR / "server.py"
@@ -24,6 +29,23 @@ CHAT_URL = "http://127.0.0.1:8000/"
 STATUS_URL = "http://127.0.0.1:8000/api/status"
 OLLAMA_URL = "http://127.0.0.1:11434/api/tags"
 STARTUP_TIMEOUT = 60
+SERVER_STARTUP_TIMEOUT = 30
+
+
+def startup_log_path():
+    """Return a per-user log path that is writable in installed builds."""
+    root = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
+    log_dir = root / "LocalChat" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "server_startup.log"
+
+
+def read_startup_log(max_chars=6000):
+    try:
+        content = startup_log_path().read_text(encoding="utf-8", errors="replace")
+        return content[-max_chars:].strip()
+    except OSError:
+        return "(گزارش شروع سرور قابل خواندن نیست.)"
 
 
 def show_error(message):
@@ -98,18 +120,56 @@ def start_chat_server():
             "درگاه ۸۰۰۰ توسط برنامهٔ دیگری استفاده شده است. آن برنامه را ببندید و دوباره تلاش کنید."
         )
 
-    subprocess.Popen(
-        [sys.executable, str(SERVER_FILE)],
-        cwd=APP_DIR,
-        creationflags=subprocess.CREATE_NEW_CONSOLE,
+    # In a frozen build, the executable relaunches itself in server mode.
+    command = (
+        [sys.executable, "--localchat-server"]
+        if getattr(sys, "frozen", False)
+        else [sys.executable, str(SERVER_FILE)]
     )
-    deadline = time.monotonic() + 20
+    log_path = startup_log_path()
+    try:
+        log_handle = log_path.open("a", encoding="utf-8", errors="replace")
+        log_handle.write(
+            f"\n--- LocalChat server start {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n"
+        )
+        log_handle.flush()
+        try:
+            process = subprocess.Popen(
+                command,
+                cwd=APP_DIR,
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                env={**os.environ, "LOCALCHAT_STARTUP_LOG": str(log_path)},
+                close_fds=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                if getattr(sys, "frozen", False)
+                else getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+            )
+        finally:
+            log_handle.close()
+    except OSError as error:
+        raise RuntimeError(
+            f"پردازش سرور ساخته نشد: {error}\nگزارش: {log_path}"
+        ) from error
+
+    deadline = time.monotonic() + SERVER_STARTUP_TIMEOUT
     while time.monotonic() < deadline:
         if chat_server_is_running():
             return
+        exit_code = process.poll()
+        if exit_code is not None:
+            details = read_startup_log()
+            raise RuntimeError(
+                f"سرور بلافاصله متوقف شد (کد خروج: {exit_code}).\n"
+                f"گزارش خطا: {log_path}\n\n{details}"
+            )
         time.sleep(0.25)
+
+    details = read_startup_log()
     raise RuntimeError(
-        "سرور چت اجرا نشد. مطمئن شوید فایل‌های برنامه کامل از ZIP استخراج شده‌اند."
+        f"سرور در {SERVER_STARTUP_TIMEOUT} ثانیه آماده نشد.\n"
+        f"گزارش خطا: {log_path}\n\n{details}"
     )
 
 
@@ -125,4 +185,20 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    if "--localchat-server" in sys.argv:
+        # Log even import-time failures; the parent redirects stdout/stderr here.
+        # Windowed PyInstaller builds may initialize sys.stdout/sys.stderr as
+        # None. Reopen the parent's diagnostic file explicitly before imports.
+        child_log = os.environ.get("LOCALCHAT_STARTUP_LOG")
+        if child_log:
+            child_stream = open(child_log, "a", encoding="utf-8", errors="replace")
+            sys.stdout = child_stream
+            sys.stderr = child_stream
+        try:
+            from local_chat.server import main as server_main
+            server_main()
+        except BaseException:
+            traceback.print_exc(file=sys.stderr)
+            raise
+    else:
+        raise SystemExit(main())

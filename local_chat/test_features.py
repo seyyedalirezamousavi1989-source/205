@@ -602,25 +602,43 @@ class ShortcutFalsePositiveTests(FeatureTestCase):
 class SearchTests(FeatureTestCase):
     def test_default_engine_is_google_and_keys_are_never_returned(self):
         status, body = self.call("GET", "/api/settings")
-        self.assertEqual(json.loads(body)["search"]["engine"], "google")
+        self.assertEqual(json.loads(body)["search"]["engine"], "auto")
         status, body = self.call("POST", "/api/settings/search", {
-            "engine": "google", "serper_api_key": "abcd1234efgh5678", "google_cx": "cx:123"})
+            "engine": "auto", "serper_api_key": "abcd1234efgh5678", "brave_api_key": "bravekey12345678", "google_cx": "cx:123"})
         self.assertEqual(status, 200)
         self.assertNotIn("abcd1234efgh5678", body.decode())
+        self.assertNotIn("bravekey12345678", body.decode())
         self.assertTrue(json.loads(body)["search"]["has_serper_key"])
+        self.assertTrue(json.loads(body)["search"]["has_brave_key"])
         status, body = self.call("GET", "/api/settings")
         self.assertNotIn("abcd1234efgh5678", body.decode())
         status, _ = self.call("POST", "/api/settings/search", {"serper_api_key": "bad key!"})
         self.assertEqual(status, 400)
         status, _ = self.call("POST", "/api/settings/search", {"engine": "bing"})
         self.assertEqual(status, 400)
-        self.call("POST", "/api/settings/search", {"serper_api_key": ""})
+        self.call("POST", "/api/settings/search", {"serper_api_key": "", "brave_api_key": ""})
         _, body = self.call("GET", "/api/settings")
         self.assertFalse(json.loads(body)["search"]["has_serper_key"])
+        self.assertFalse(json.loads(body)["search"]["has_brave_key"])
 
+        status, body = self.call("POST", "/api/settings/search", {
+            "searxng_url": "https://search.example.org"
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)["search"]["has_searxng"])
+        self.assertEqual(json.loads(body)["search"]["searxng_url"], "https://search.example.org")
+        status, _ = self.call("POST", "/api/settings/search", {
+            "searxng_url": "https://search.example.org/private/path"
+        })
+        self.assertEqual(status, 400)
+        self.call("POST", "/api/settings/search", {"searxng_url": ""})
+
+
+    @patch("local_chat.search_providers.search_bing_rss", return_value=[])
     @patch("local_chat.server._fetch_public_page", return_value="متن")
     @patch("local_chat.search_providers.urlopen")
-    def test_google_via_serper(self, mock_open, _page):
+    @patch("local_chat.server._ddg_results", return_value=[])
+    def test_google_via_serper(self, _ddg, mock_open, _page, _bing):
         app_settings.set_search_settings({"serper_api_key": "abcd1234efgh5678"})
         payload = {"organic": [
             {"title": "نتیجه ۱", "link": "https://example.com/a", "snippet": "خلاصه"},
@@ -630,38 +648,41 @@ class SearchTests(FeatureTestCase):
         status, body = self.call("POST", "/api/search", {"query": "قیمت دلار"})
         data = json.loads(body)
         self.assertEqual(status, 200)
-        self.assertEqual((data["engine"], data["provider"], data["fallback"]), ("google", "serper", False))
+        self.assertEqual((data["engine"], data["provider"], data["fallback"]), ("Google / Serper", "Google / Serper", False))
         self.assertEqual([r["url"] for r in data["results"]], ["https://example.com/a"])
         request = mock_open.call_args.args[0]
         self.assertEqual(request.full_url, "https://google.serper.dev/search")
         self.assertEqual(request.get_header("X-api-key"), "abcd1234efgh5678")
         self.assertEqual(json.loads(request.data)["hl"], "fa")
 
+    @patch("local_chat.search_providers.search_bing_rss", return_value=[])
     @patch("local_chat.server._fetch_public_page", return_value="")
     @patch("local_chat.search_providers.urlopen")
-    def test_google_cse_provider(self, mock_open, _page):
+    @patch("local_chat.server._ddg_results", return_value=[])
+    def test_google_cse_provider(self, _ddg, mock_open, _page, _bing):
         app_settings.set_search_settings({"google_api_key": "AIzaSyFAKEKEY12345", "google_cx": "cx123"})
         mock_open.return_value = FakeHttp(json.dumps({"items": [
             {"title": "T", "link": "https://example.org/x", "snippet": "S"}]}).encode())
         data = json.loads(self.call("POST", "/api/search", {"query": "hello"})[1])
-        self.assertEqual(data["provider"], "google_cse")
+        self.assertEqual(data["provider"], "Google CSE")
         self.assertIn("key=AIzaSyFAKEKEY12345", mock_open.call_args.args[0].full_url)
 
-    @patch("local_chat.server._search_duckduckgo", return_value=[{"title": "d", "url": "https://d.example/", "snippet": "", "content": ""}])
+    @patch("local_chat.search_providers.search_bing_rss", return_value=[])
+    @patch("local_chat.server._ddg_results", return_value=[{"title": "d", "url": "https://d.example/", "snippet": "", "content": ""}])
     @patch("local_chat.search_providers.urlopen")
-    def test_falls_back_to_duckduckgo_and_says_so(self, mock_open, _ddg):
+    def test_falls_back_to_duckduckgo_and_says_so(self, mock_open, _ddg, _bing):
         from urllib.error import HTTPError
 
         app_settings.set_search_settings({"serper_api_key": "abcd1234efgh5678"})
         mock_open.side_effect = HTTPError("u", 403, "forbidden", {}, None)
-        data = json.loads(self.call("POST", "/api/search", {"query": "x"})[1])
-        self.assertEqual((data["engine"], data["fallback"]), ("duckduckgo", True))
-        self.assertIn("DuckDuckGo", data["notice"])
-        self.assertIn("کلید", data["notice"])
+        data = json.loads(self.call("POST", "/api/search", {"query": "example query"})[1])
+        self.assertEqual((data["engine"], data["fallback"]), ("DuckDuckGo", True))
+        self.assertEqual(data["provider"], "DuckDuckGo")
+        self.assertTrue(data["errors"])
         self.assertNotIn("abcd1234efgh5678", json.dumps(data))
         # the failed keyless attempt is remembered, so the next search does not retry it for a while
         calls = mock_open.call_count
-        self.call("POST", "/api/search", {"query": "y"})
+        self.call("POST", "/api/search", {"query": "another example query"})
         self.assertEqual(mock_open.call_count, calls + 1)  # only serper again
 
     def test_keyless_google_html_parser_and_block_detection(self):
@@ -675,10 +696,10 @@ class SearchTests(FeatureTestCase):
 
     def test_engine_duckduckgo_skips_google(self):
         app_settings.set_search_settings({"engine": "duckduckgo"})
-        with patch("local_chat.server._search_duckduckgo", return_value=[]) as ddg, \
+        with patch("local_chat.server._ddg_results", return_value=[]) as ddg, \
                 patch("local_chat.search_providers.urlopen") as google:
-            data = json.loads(self.call("POST", "/api/search", {"query": "x"})[1])
-        self.assertEqual(data["engine"], "duckduckgo")
+            data = json.loads(self.call("POST", "/api/search", {"query": "example query"})[1])
+        self.assertEqual(data["engine"], "none")
         google.assert_not_called()
         ddg.assert_called_once()
 

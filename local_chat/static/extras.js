@@ -569,24 +569,31 @@ customModelInput.addEventListener("keydown", (event) => {
 
 const searchEngineSelect = document.getElementById("searchEngine");
 const serperKeyInput = document.getElementById("serperKey");
+const braveKeyInput = document.getElementById("braveKey");
 const googleKeyInput = document.getElementById("googleKey");
 const googleCxInput = document.getElementById("googleCx");
+const searxngUrlInput = document.getElementById("searxngUrl");
 const searchStatus = document.getElementById("searchStatus");
 
 function showSearchSettings(search) {
   if (!search) return;
   searchEngineSelect.value = search.engine;
   serperKeyInput.value = "";
+  braveKeyInput.value = "";
   googleKeyInput.value = "";
   serperKeyInput.placeholder = search.has_serper_key ? `Serper ذخیره شده (${search.serper_hint}) — برای تغییر، کلید تازه بنویس` : "Serper API key";
+  braveKeyInput.placeholder = search.has_brave_key ? `Brave ذخیره شده (${search.brave_hint}) — برای تغییر، کلید تازه بنویس` : "Brave Search API key";
   googleKeyInput.placeholder = search.google_api_hint ? `Google key ذخیره شده (${search.google_api_hint})` : "Google API key (اختیاری)";
   googleCxInput.value = search.google_cx || "";
+  searxngUrlInput.value = search.searxng_url || "";
   setSearchEngineLabel(search.engine);
   const parts = [];
-  if (search.engine === "google") {
-    if (search.has_serper_key) parts.push("نتایج گوگل از Serper");
-    else if (search.has_google_cse) parts.push("نتایج گوگل از Custom Search");
-    else parts.push("کلیدی ثبت نشده: بیشتر وقت‌ها به DuckDuckGo برمی‌گردد");
+  if (search.engine === "auto") parts.push("حالت خودکار: ترکیب موتورهای در دسترس");
+  if (search.has_serper_key) parts.push("Serper فعال");
+  if (search.has_brave_key) parts.push("Brave فعال");
+  if (search.has_searxng) parts.push("SearXNG تنظیم شده");
+  if (!search.has_serper_key && !search.has_brave_key && !search.has_google_cse) {
+    parts.push("بدون کلید: جست‌وجوی رایگان با پوشش محدودتر");
   }
   searchStatus.className = "settings-status";
   searchStatus.textContent = parts.join(" · ");
@@ -604,8 +611,9 @@ async function loadSearchSettings() {
 }
 
 document.getElementById("saveSearch").addEventListener("click", async () => {
-  const body = { engine: searchEngineSelect.value, google_cx: googleCxInput.value.trim() };
+  const body = { engine: searchEngineSelect.value, google_cx: googleCxInput.value.trim(), searxng_url: searxngUrlInput.value.trim() };
   if (serperKeyInput.value.trim()) body.serper_api_key = serperKeyInput.value.trim();
+  if (braveKeyInput.value.trim()) body.brave_api_key = braveKeyInput.value.trim();
   if (googleKeyInput.value.trim()) body.google_api_key = googleKeyInput.value.trim();
   try {
     const response = await fetch("/api/settings/search", {
@@ -627,7 +635,7 @@ document.getElementById("clearSearchKeys").addEventListener("click", async () =>
     const response = await fetch("/api/settings/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serper_api_key: "", google_api_key: "", google_cx: "" }),
+      body: JSON.stringify({ serper_api_key: "", brave_api_key: "", google_api_key: "", google_cx: "" }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "پاک کردن ناموفق بود.");

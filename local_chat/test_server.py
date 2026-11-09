@@ -737,7 +737,7 @@ class ChatServerTests(unittest.TestCase):
         )[0]
         self.assertEqual(remaining, 0)
 
-    @patch("local_chat.server._search_duckduckgo", return_value=[])
+    @patch("local_chat.server._ddg_results", return_value=[])
     def test_search_endpoint_validates_and_returns_search_results(self, mock_search):
         import local_chat.settings as app_settings
 
@@ -747,7 +747,7 @@ class ChatServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         data = json.loads(body)
         self.assertEqual(data["results"], [])
-        self.assertEqual(data["engine"], "duckduckgo")
+        self.assertEqual(data["engine"], "none")
         mock_search.assert_called_once_with("آب و هوا")
 
     def test_search_endpoint_rejects_empty_query(self):
@@ -756,7 +756,7 @@ class ChatServerTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("جست‌وجو", json.loads(body)["error"])
 
-    @patch("local_chat.server._search_duckduckgo")
+    @patch("local_chat.server._ddg_results")
     def test_search_endpoint_reports_search_provider_errors(self, mock_search):
         import local_chat.settings as app_settings
 
@@ -764,8 +764,10 @@ class ChatServerTests(unittest.TestCase):
         mock_search.side_effect = RuntimeError("موتور جست‌وجو موقتاً در دسترس نیست")
         status, body = self.request("POST", "/api/search", {"query": "موضوع"})
 
-        self.assertEqual(status, 502)
-        self.assertIn("در دسترس نیست", json.loads(body)["error"])
+        self.assertEqual(status, 200)
+        data = json.loads(body)
+        self.assertEqual(data["results"], [])
+        self.assertTrue(data["errors"])
 
     @patch("local_chat.server._fetch_public_page", return_value="متن صفحه")
     @patch("local_chat.server.urlopen")

@@ -1,0 +1,41 @@
+name: Search engine tests
+
+on:
+  push:
+    branches:
+      - feature/search-overhaul-205
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "local_chat/launcher.py"
+      - "local_chat/test_packaging.py"
+      - "packaging/*.spec"
+      - "build_installer.bat"
+      - "local_chat/search_engine.py"
+      - "local_chat/search_plan.py"
+      - "local_chat/search_providers.py"
+      - "local_chat/settings.py"
+      - "local_chat/server.py"
+      - "local_chat/static/*.js"
+      - "local_chat/static/index.html"
+      - "local_chat/test_search*.py"
+      - ".github/workflows/search-tests.yml"
+
+jobs:
+  search-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test runner
+        run: python -m pip install --upgrade pytest
+      - name: Compile Python modules
+        run: python -m compileall -q local_chat
+      - name: Check JavaScript syntax
+        run: node --check local_chat/static/app.js && node --check local_chat/static/extras.js
+      - name: Run complete local_chat test suite
+        run: python -m pytest -q local_chat

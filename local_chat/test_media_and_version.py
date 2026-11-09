@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent
 PROJECT = ROOT.parent
 sys.path.insert(0, str(PROJECT))
 
-from local_chat import media_search, search_intent, version  # noqa: E402
+from local_chat import media_search, search_intent, search_engine, version  # noqa: E402
 
 
 # ------------------------------------------------------------------ version
@@ -29,7 +29,7 @@ def test_version_is_consistent_everywhere():
 def test_new_modules_are_in_both_specs():
     for name in ("localchat.spec", "localchat_onefile.spec"):
         text = (PROJECT / "packaging" / name).read_text(encoding="utf-8")
-        for module in ("local_chat.version", "local_chat.media_search", "local_chat.search_intent", "edge_tts"):
+        for module in ("local_chat.version", "local_chat.media_search", "local_chat.search_intent", "local_chat.search_engine", "edge_tts"):
             assert module in text, (name, module)
 
 
@@ -152,6 +152,7 @@ def test_search_api_returns_media_with_intent(server, monkeypatch):
     srv, base = server
     media_search._CACHE.clear()
     monkeypatch.setattr(media_search, "youtube", lambda q, kind="video", limit=5: [media_search._item("Clip", "https://www.youtube.com/watch?v=abcdefghijk", "YouTube", kind, "YouTube")])
+    monkeypatch.setattr(srv, "_ddg_results", lambda _query: [])
     status, _h, body = _post(base + "/api/search", {"query": "کلیپ آموزش پایتون رو پیدا کن"})
     data = json.loads(body)
     assert status == 200 and data["intent"]["kind"] == "video"
