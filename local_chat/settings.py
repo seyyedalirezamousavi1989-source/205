@@ -115,7 +115,7 @@ def ollama_environment():
 
 # --- web search -------------------------------------------------------------------
 
-SEARCH_ENGINES = ("auto", "google", "brave", "duckduckgo")
+SEARCH_ENGINES = ("auto", "google", "brave", "duckduckgo", "searxng")
 _KEY_PATTERN = re.compile(r"^[A-Za-z0-9_\-.]{8,200}$")
 _CX_PATTERN = re.compile(r"^[A-Za-z0-9:_\-.]{3,120}$")
 SEARCH_KEY_FIELDS = {
@@ -131,7 +131,7 @@ def search_settings():
     data = load_settings().get("search", {})
     data = data if isinstance(data, dict) else {}
     engine = data.get("engine")
-    result = {"engine": engine if engine in SEARCH_ENGINES else "auto"}
+    result = {"engine": engine if engine in SEARCH_ENGINES else "auto"}\n    searxng_url = os.environ.get("LOCALCHAT_SEARXNG_URL", data.get("searxng_url", ""))\n    result["searxng_url"] = searxng_url.strip().rstrip("/") if isinstance(searxng_url, str) else ""
     for field in SEARCH_KEY_FIELDS:
         value = data.get(field)
         result[field] = value.strip() if isinstance(value, str) else ""
@@ -153,7 +153,7 @@ def search_settings_public():
         "serper_hint": _hint(full["serper_api_key"]),
         "has_google_cse": bool(full["google_api_key"] and full["google_cx"]),
         "google_api_hint": _hint(full["google_api_key"]),
-        "google_cx": full["google_cx"],
+        "google_cx": full["google_cx"],\n        "searxng_url": full["searxng_url"],\n        "has_searxng": bool(full["searxng_url"]),
     }
 
 
@@ -172,7 +172,7 @@ def set_search_settings(update):
             if update["engine"] not in SEARCH_ENGINES:
                 raise ValueError("موتور جست‌وجو معتبر نیست.")
             search["engine"] = update["engine"]
-        for field, pattern in SEARCH_KEY_FIELDS.items():
+        if "searxng_url" in update:\n            value = update["searxng_url"]\n            if not isinstance(value, str):\n                raise ValueError("نشانی SearXNG معتبر نیست.")\n            value = value.strip().rstrip("/")\n            if not value:\n                search.pop("searxng_url", None)\n            else:\n                from urllib.parse import urlsplit\n                parts = urlsplit(value)\n                if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.query or parts.fragment:\n                    raise ValueError("نشانی SearXNG باید HTTPS و بدون مسیر، پارامتر یا اطلاعات ورود باشد.")\n                search["searxng_url"] = value\n        for field, pattern in SEARCH_KEY_FIELDS.items():
             if field not in update:
                 continue
             value = update[field]
