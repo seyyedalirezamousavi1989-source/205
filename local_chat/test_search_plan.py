@@ -27,6 +27,12 @@ def test_explicit_domain_allow_and_deny_lists():
     assert search_plan.host_allowed("other.com", excluded["constraints"])
 
 
+def test_ordinary_site_mention_is_preserved_as_search_content():
+    plan = search_plan.parse_search_request("ویدیو آموزش پایتون در آپارات پیدا کن")
+    assert "آپارات" in plan["query"]
+    assert plan["constraints"]["allowed_domains"] == []
+
+
 def test_file_type_is_extracted_without_llm():
     plan = search_plan.parse_search_request("مقاله یادگیری ماشین فایل PDF")
     assert "pdf" in plan["constraints"]["content_types"]
