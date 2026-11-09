@@ -35,6 +35,14 @@ def test_explicit_domain_allow_and_deny_lists():
     assert search_plan.host_allowed("other.com", excluded["constraints"])
 
 
+def test_allowed_and_excluded_sites_can_be_combined():
+    plan = search_plan.parse_search_request(
+        "قیمت RTX 5070 فقط سایت example.com به جز bad.example"
+    )
+    assert plan["constraints"]["allowed_domains"] == ["example.com"]
+    assert plan["constraints"]["excluded_domains"] == ["bad.example"]
+
+
 def test_site_alias_without_word_site_is_understood_and_removed_from_query():
     plan = search_plan.parse_search_request("قیمت RTX 5070 فقط دیجی‌کالا")
     assert plan["constraints"]["allowed_domains"] == ["digikala.com"]
