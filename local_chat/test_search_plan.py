@@ -16,6 +16,14 @@ def test_named_iranian_site_becomes_strict_domain_scope():
     assert plan["query"] == "قیمت RTX 5070"
 
 
+def test_malformed_domain_does_not_crash_search_plan():
+    plan = search_plan.parse_search_request(
+        "موضوع",
+        {"allowed_domains": ["https://[invalid", "javascript:alert(1)"]},
+    )
+    assert plan["constraints"]["allowed_domains"] == []
+
+
 def test_explicit_domain_allow_and_deny_lists():
     allowed = search_plan.parse_search_request("benchmark RTX 5070 فقط سایت example.com")
     assert allowed["constraints"]["allowed_domains"] == ["example.com"]
