@@ -11,12 +11,15 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 
-try:
-    from . import settings as app_settings
-    from .version import APP_VERSION
-except ImportError:  # run as a plain script
-    import settings as app_settings
-    from version import APP_VERSION
+# PyInstaller executes the entry script as __main__, so it has no package
+# context and relative imports fail. Add the project/bundle root explicitly,
+# then always import through the real local_chat package.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from local_chat import settings as app_settings
+from local_chat.version import APP_VERSION
 
 APP_DIR = Path(__file__).resolve().parent
 SERVER_FILE = APP_DIR / "server.py"
