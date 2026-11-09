@@ -675,14 +675,14 @@ class SearchTests(FeatureTestCase):
 
         app_settings.set_search_settings({"serper_api_key": "abcd1234efgh5678"})
         mock_open.side_effect = HTTPError("u", 403, "forbidden", {}, None)
-        data = json.loads(self.call("POST", "/api/search", {"query": "x"})[1])
+        data = json.loads(self.call("POST", "/api/search", {"query": "example query"})[1])
         self.assertEqual((data["engine"], data["fallback"]), ("DuckDuckGo", True))
         self.assertEqual(data["provider"], "DuckDuckGo")
         self.assertTrue(data["errors"])
         self.assertNotIn("abcd1234efgh5678", json.dumps(data))
         # the failed keyless attempt is remembered, so the next search does not retry it for a while
         calls = mock_open.call_count
-        self.call("POST", "/api/search", {"query": "y"})
+        self.call("POST", "/api/search", {"query": "another example query"})
         self.assertEqual(mock_open.call_count, calls + 1)  # only serper again
 
     def test_keyless_google_html_parser_and_block_detection(self):
@@ -698,7 +698,7 @@ class SearchTests(FeatureTestCase):
         app_settings.set_search_settings({"engine": "duckduckgo"})
         with patch("local_chat.server._ddg_results", return_value=[]) as ddg, \
                 patch("local_chat.search_providers.urlopen") as google:
-            data = json.loads(self.call("POST", "/api/search", {"query": "x"})[1])
+            data = json.loads(self.call("POST", "/api/search", {"query": "example query"})[1])
         self.assertEqual(data["engine"], "none")
         google.assert_not_called()
         ddg.assert_called_once()
