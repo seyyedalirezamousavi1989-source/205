@@ -43,7 +43,7 @@ if __package__:
     from . import settings as app_settings
     from . import files as attach_files
     from . import models_catalog
-    from . import search_providers, search_intent, media_search, search_engine
+    from . import search_providers, search_intent, media_search, search_engine, search_plan, search_plan
     from . import version as version_info
     from . import system_tools
     from . import coding_agent
@@ -2797,7 +2797,7 @@ class ChatHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            outcome = _search_web(query.strip())
+            search_options = payload.get("search_options")\n            if search_options is not None and not isinstance(search_options, dict):\n                self._send_json(400, {"error": "محدودیت‌های جست‌وجو باید یک شیء معتبر باشند."})\n                return\n            outcome = _search_web(query.strip(), search_options=search_options)
         except RuntimeError as exc:
             self._send_json(502, {"error": str(exc)})
             return
