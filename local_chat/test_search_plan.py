@@ -40,6 +40,12 @@ def test_persian_sites_filter_does_not_require_a_domain():
     assert plan["strict_domains"] is False
 
 
+def test_ai_topic_is_not_mistaken_for_an_ai_file_extension():
+    plan = search_plan.parse_search_request("مقاله درباره AI و یادگیری ماشین")
+    assert plan["constraints"]["content_types"] == []
+    assert plan["constraints"]["file_search"] is False
+
+
 def test_generic_file_search_marks_direct_file_results():
     plan = search_plan.parse_search_request("فایل‌های مربوط به آموزش پایتون را پیدا کن")
     assert plan["constraints"]["file_search"] is True
@@ -50,6 +56,18 @@ def test_ordinary_site_mention_is_preserved_as_search_content():
     plan = search_plan.parse_search_request("ویدیو آموزش پایتون در آپارات پیدا کن")
     assert "آپارات" in plan["query"]
     assert plan["constraints"]["allowed_domains"] == []
+
+
+def test_file_filter_requires_a_direct_file_url():
+    constraints = {"file_search": True, "content_types": ["pdf"]}
+    assert search_plan.result_matches_constraints(
+        {"url": "https://example.com/report.pdf", "title": "Report", "snippet": ""},
+        constraints,
+    )
+    assert not search_plan.result_matches_constraints(
+        {"url": "https://example.com/report", "title": "Report", "snippet": ""},
+        constraints,
+    )
 
 
 def test_file_type_is_extracted_without_llm():
