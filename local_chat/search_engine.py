@@ -426,7 +426,7 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, 
             sample = " ".join((item.get("title") or "", item.get("snippet") or "", item.get("content") or ""))
             letters = [char for char in sample if char.isalpha()]
             persian_ratio = (
-                sum(1 for char in letters if "\\u0600" <= char <= "\\u06ff") / len(letters)
+                sum(1 for char in letters if "\u0600" <= char <= "\u06ff") / len(letters)
                 if letters else 0.0
             )
             item["language_verified"] = bool(len(letters) >= 10 and persian_ratio >= 0.08)
