@@ -141,7 +141,7 @@ def search_settings():
 
 
 def _hint(value):
-    return ("\\u2022\\u2022\\u2022\\u2022" + value[-4:]) if value else ""
+    return ("\u2022\u2022\u2022\u2022" + value[-4:]) if value else ""
 
 
 def search_settings_public():
