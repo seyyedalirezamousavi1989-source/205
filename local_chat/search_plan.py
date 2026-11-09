@@ -25,7 +25,7 @@ _KNOWN_FILE_EXTENSIONS = {
     "pdf", "doc", "docx", "odt", "rtf", "xls", "xlsx", "ods", "csv",
     "ppt", "pptx", "odp", "zip", "rar", "7z", "tar", "gz", "json", "xml",
     "txt", "md", "epub", "mp3", "mp4", "wav", "jpg", "jpeg", "png", "gif",
-    "webp", "psd", "ai", "dwg", "dxf", "stl", "obj", "exe", "msi", "apk", "iso",
+    "webp", "psd", "dwg", "dxf", "stl", "obj", "exe", "msi", "apk", "iso",
 }
 _FILE_EXTENSIONS = {
     "pdf": "pdf", "پی دی اف": "pdf", "پی‌دی‌اف": "pdf",
@@ -126,6 +126,9 @@ def parse_search_request(raw_query, supplied=None):
         )
         if term_found and extension and extension not in content_types:
             content_types.append(extension)
+    if re.search(r"(?:فایل|file)\\s+ai\\b|\\bfiletype:ai\\b", lower):
+        if "ai" not in content_types:
+            content_types.append("ai")
     for extension in sorted(_KNOWN_FILE_EXTENSIONS):
         explicit_filetype = re.search(r"\bfiletype:\s*" + re.escape(extension) + r"\b", lower)
         mentioned_with_file = file_search and re.search(r"\b" + re.escape(extension) + r"\b", lower)
