@@ -13,6 +13,8 @@ on:
       - "local_chat/search_providers.py"
       - "local_chat/settings.py"
       - "local_chat/server.py"
+      - "local_chat/static/*.js"
+      - "local_chat/static/index.html"
       - "local_chat/test_search*.py"
       - ".github/workflows/search-tests.yml"
 
@@ -27,5 +29,9 @@ jobs:
           python-version: "3.11"
       - name: Install test runner
         run: python -m pip install --upgrade pytest
+      - name: Compile Python modules
+        run: python -m compileall -q local_chat
+      - name: Check JavaScript syntax
+        run: node --check local_chat/static/app.js && node --check local_chat/static/extras.js
       - name: Run isolated search tests
         run: python -m pytest -q local_chat/test_search_engine.py local_chat/test_search_plan.py local_chat/test_search_providers.py
