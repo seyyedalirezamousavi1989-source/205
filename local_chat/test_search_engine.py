@@ -104,6 +104,7 @@ def test_auto_prefers_keyless_providers_before_paid_fallback():
 def test_product_detection_includes_common_consumer_products():
     assert search_engine.classify("قیمت گوشی آیفون 17") == "product"
     assert search_engine.classify("خرید کفش ورزشی") == "product"
+    assert search_engine.classify("خرید بلیط هواپیما") == "web"
 
 
 def test_empty_search_does_not_call_provider():
