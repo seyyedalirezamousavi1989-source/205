@@ -6,8 +6,8 @@ URLs. The user's natural-language request remains the source of truth.
 import re
 from urllib.parse import urlsplit
 
-_PERSIAN = re.compile(r"[\\u0600-\\u06FF]")
-_DOMAIN = re.compile(r"(?i)(?:https?://)?(?:[a-z0-9-]+\\.)+[a-z]{2,}(?:/[\\w./%-]*)?")
+_PERSIAN = re.compile(r"[\u0600-\u06FF]")
+_DOMAIN = re.compile(r"(?i)(?:https?://)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/[\w./%-]*)?")
 _ALIASES = {
     "دیجی کالا": "digikala.com",
     "دیجی‌کالا": "digikala.com",
@@ -32,7 +32,7 @@ _FILE_EXTENSIONS = {
 
 def _norm(value):
     value = str(value or "").replace("\u200c", " ").replace("ي", "ی").replace("ك", "ک")
-    return re.sub(r"\\s+", " ", value).strip()
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def _domain(value):
@@ -73,8 +73,8 @@ def parse_search_request(raw_query, supplied=None):
     allowed = [_domain(x) for x in allowed] if isinstance(allowed, list) else []
     excluded = [_domain(x) for x in excluded] if isinstance(excluded, list) else []
 
-    only_site = bool(re.search(r"(?:فقط|صرفا|صرفاً)\\s*(?:در\\s*)?(?:سایت|دامنه|وبسایت|وب\\s*سایت)|only\\s+(?:the\\s+)?(?:site|domain|website)", lower))
-    exclude_site = bool(re.search(r"(?:به\\s*جز|به\\s*غیر\\s*از|غیر\\s*از|به\\s*استثنای)|(?:except|excluding|exclude)", lower))
+    only_site = bool(re.search(r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:سایت|دامنه|وبسایت|وب\s*سایت)|only\s+(?:the\s+)?(?:site|domain|website)", lower))
+    exclude_site = bool(re.search(r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای)|(?:except|excluding|exclude)", lower))
     mentioned_domains = _extract_domains(original)
     if only_site and not allowed and mentioned_domains:
         allowed = mentioned_domains
@@ -82,13 +82,13 @@ def parse_search_request(raw_query, supplied=None):
         excluded = mentioned_domains
 
     fa_only = bool(re.search(
-        r"(?:فقط|صرفا|صرفاً)\\s*(?:سایت(?:های|\\s*های)?|منابع?)\\s*فارسی|"
-        r"(?:سایت(?:های|\\s*های)?|منابع?)\\s*فارسی\\s*(?:فقط|باشه|باشد)|"
-        r"only\\s+persian\\s+(?:sites|sources)", lower))
+        r"(?:فقط|صرفا|صرفاً)\s*(?:سایت(?:های|\s*های)?|منابع?)\s*فارسی|"
+        r"(?:سایت(?:های|\s*های)?|منابع?)\s*فارسی\s*(?:فقط|باشه|باشد)|"
+        r"only\s+persian\s+(?:sites|sources)", lower))
     iran_only = bool(re.search(
-        r"(?:فقط|صرفا|صرفاً)\\s*(?:سایت(?:های|\\s*های)?|فروشگاه(?:های|\\s*های)?|منابع?)\\s*ایرانی|"
-        r"(?:سایت(?:های|\\s*های)?|فروشگاه(?:های|\\s*های)?|منابع?)\\s*ایرانی\\s*(?:فقط|باشه|باشد)|"
-        r"iranian\\s+(?:sites|stores|sources)\\s+only", lower))\n    only_site = only_site and not (fa_only or iran_only)
+        r"(?:فقط|صرفا|صرفاً)\s*(?:سایت(?:های|\s*های)?|فروشگاه(?:های|\s*های)?|منابع?)\s*ایرانی|"
+        r"(?:سایت(?:های|\s*های)?|فروشگاه(?:های|\s*های)?|منابع?)\s*ایرانی\s*(?:فقط|باشه|باشد)|"
+        r"iranian\s+(?:sites|stores|sources)\s+only", lower))\n    only_site = only_site and not (fa_only or iran_only)
 
     content_types = supplied.get("content_types")
     if not isinstance(content_types, list):
@@ -99,22 +99,22 @@ def parse_search_request(raw_query, supplied=None):
         if term in lower:
             if kind and kind not in content_types:
                 content_types.append(kind)
-    if re.search(r"\\b(?:filetype:)?(?:pdf|docx|xlsx|pptx|zip)\\b", lower):
+    if re.search(r"\b(?:filetype:)?(?:pdf|docx|xlsx|pptx|zip)\b", lower):
         for ext in ("pdf", "docx", "xlsx", "pptx", "zip"):
-            if re.search(r"\\b" + ext + r"\\b", lower) and ext not in content_types:
+            if re.search(r"\b" + ext + r"\b", lower) and ext not in content_types:
                 content_types.append(ext)
 
     # Remove only recognized constraint clauses; preserve the subject and quoted phrases.
     query = original
     patterns = [
-        r"(?:فقط|صرفا|صرفاً)\\s*(?:سایت(?:های|\\s*های)?|منابع?)\\s*(?:فارسی|ایرانی)",
-        r"(?:فقط|صرفا|صرفاً)\\s*(?:فروشگاه(?:های|\\s*های)?|سایت(?:های|\\s*های)?|منابع?)\\s*ایرانی",
-        r"(?:فقط|صرفا|صرفاً)\\s*(?:در\\s*)?(?:سایت|دامنه|وبسایت|وب\\s*سایت)\\s+[\\w.-]+",
-        r"(?:به\\s*جز|به\\s*غیر\\s*از|غیر\\s*از|به\\s*استثنای)\\s+(?:سایت\\s+)?[\\w.-]+",
-        r"only\\s+persian\\s+(?:sites|sources)",
-        r"iranian\\s+(?:sites|stores|sources)\\s+only",
-        r"only\\s+(?:the\\s+)?(?:site|domain|website)\\s+[\\w.-]+",
-        r"(?:except|excluding|exclude)\\s+[\\w.-]+",
+        r"(?:فقط|صرفا|صرفاً)\s*(?:سایت(?:های|\s*های)?|منابع?)\s*(?:فارسی|ایرانی)",
+        r"(?:فقط|صرفا|صرفاً)\s*(?:فروشگاه(?:های|\s*های)?|سایت(?:های|\s*های)?|منابع?)\s*ایرانی",
+        r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:سایت|دامنه|وبسایت|وب\s*سایت)\s+[\w.-]+",
+        r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای)\s+(?:سایت\s+)?[\w.-]+",
+        r"only\s+persian\s+(?:sites|sources)",
+        r"iranian\s+(?:sites|stores|sources)\s+only",
+        r"only\s+(?:the\s+)?(?:site|domain|website)\s+[\w.-]+",
+        r"(?:except|excluding|exclude)\s+[\w.-]+",
     ]
     for pattern in patterns:
         query = re.sub(pattern, " ", query, flags=re.I)
@@ -124,7 +124,7 @@ def parse_search_request(raw_query, supplied=None):
         for alias in _ALIASES:
             query = re.sub(re.escape(alias), " ", query, flags=re.I)
     query = re.sub(r"[،,;؛]+", " ", query)
-    query = re.sub(r"\\s+", " ", query).strip(" -:")
+    query = re.sub(r"\s+", " ", query).strip(" -:")
     if len(query) < 2:
         query = original
 
@@ -167,7 +167,7 @@ def result_matches_constraints(item, constraints):
     if language == "fa":
         sample = " ".join((item.get("title") or "", item.get("snippet") or "", item.get("content") or ""))
         letters = [c for c in sample if c.isalpha()]
-        if len(letters) >= 10 and sum(1 for c in letters if "\\u0600" <= c <= "\\u06ff") / len(letters) < 0.08:
+        if len(letters) >= 10 and sum(1 for c in letters if "\u0600" <= c <= "\u06ff") / len(letters) < 0.08:
             return False
     region = constraints.get("region")
     if region == "IR":
