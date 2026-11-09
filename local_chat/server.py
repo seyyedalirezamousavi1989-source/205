@@ -1287,16 +1287,27 @@ SEARCH_PROVIDER_LABELS = {
     ),
     documentation="web_search.md",
 )
-def _search_web(query):
+def _search_web(query, search_options=None):
     """Search real web pages and specialized media sources; never synthesize result URLs."""
     intent = search_intent.classify(query)
     public_intent = {"kind": intent["kind"], "topic": intent["topic"]}
+    parsed = search_plan.parse_search_request(query, search_options)
+    constraints = parsed["constraints"]
+    has_constraints = bool(
+        parsed.get("strict_domains") or constraints.get("language") or constraints.get("region")
+        or constraints.get("allowed_domains") or constraints.get("excluded_domains")
+        or constraints.get("content_types")
+    )
+    # Explicit user constraints take precedence over specialized media shortcuts.
+    if has_constraints:
+        outcome = _search_web_text(query, search_options=search_options)
+        outcome["intent"] = public_intent
+        return outcome
     if intent["kind"] in ("image", "video", "music", "movie"):
         items = media_search.search_media(
             intent["kind"], intent["topic"], intent["lang"], intent.get("kind_word", ""),
             web_fallback=None if intent["kind"] == "video" else _ddg_results)
         if intent["kind"] == "video":
-            # Supplement YouTube with domain-targeted discovery for Aparat and other hosts.
             web = _search_web_text(f"{intent['topic']} video")
             web_items = list(web.get("results") or [])
             merged = []
@@ -1332,13 +1343,13 @@ def _search_web(query):
     return outcome
 
 
-def _search_web_text(query):
-    """Multi-provider search with intent-aware product/video domain expansion."""
+def _search_web_text(query, search_options=None):
+    """Adaptive multi-provider search with conversational constraints."""
     config = app_settings.search_settings()
     try:
         return search_engine.search(
             query, config, _ddg_results, page_fetch=_fetch_public_page,
-            max_results=MAX_SEARCH_RESULTS,
+            max_results=MAX_SEARCH_RESULTS, search_options=search_options,
         )
     except search_engine.SearchError as exc:
         raise RuntimeError(str(exc)) from exc
@@ -2795,13 +2806,17 @@ class ChatHandler(BaseHTTPRequestHandler):
         ):
             self._send_json(400, {"error": "عبارت جست‌وجو خالی یا بیش از حد طولانی است."})
             return
-
+        search_options = payload.get("search_options")
+        if search_options is not None and not isinstance(search_options, dict):
+            self._send_json(400, {"error": "محدودیت‌های جست‌وجو باید یک شیء معتبر باشند."})
+            return
         try:
-            search_options = payload.get("search_options")\n            if search_options is not None and not isinstance(search_options, dict):\n                self._send_json(400, {"error": "محدودیت‌های جست‌وجو باید یک شیء معتبر باشند."})\n                return\n            outcome = _search_web(query.strip(), search_options=search_options)
+            outcome = _search_web(query.strip(), search_options=search_options)
         except RuntimeError as exc:
             self._send_json(502, {"error": str(exc)})
             return
         self._send_json(200, outcome)
+
 
     def do_POST(self):
         if not self._request_allowed(mutating=True):
