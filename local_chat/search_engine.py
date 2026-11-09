@@ -131,7 +131,9 @@ def _normalize_item(item, provider, query, kind):
         "link_type": "product" if kind == "product" and product_path else (
             "video" if kind == "video" and video_url else "webpage"
         ),
-        "verified": False,\n        "query": query,\n        "mime_type": str(item.get("mime_type") or ""),
+        "verified": False,
+        "query": query,
+        "mime_type": str(item.get("mime_type") or ""),
     }
 
 
