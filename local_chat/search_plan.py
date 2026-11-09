@@ -106,10 +106,22 @@ def parse_search_request(raw_query, supplied=None):
     excluded_raw = supplied.get("excluded_domains")
     allowed = [_domain(x) for x in allowed_raw] if isinstance(allowed_raw, list) else []
     excluded = [_domain(x) for x in excluded_raw] if isinstance(excluded_raw, list) else []
-    if only_site and not allowed and mentioned_domains:
-        allowed = mentioned_domains
-    if exclude_site and not excluded and mentioned_domains:
-        excluded = mentioned_domains
+    if only_site and not allowed:
+        if exclude_site:
+            allow_clause = re.search(
+                r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:سایت|دامنه|وبسایت|وب\s*سایت)?\s*(.*?)"
+                r"(?=(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای|except|excluding|exclude)|$)",
+                original, flags=re.I,
+            )
+            allowed = _extract_domains(allow_clause.group(1)) if allow_clause else []
+        else:
+            allowed = mentioned_domains
+    if exclude_site and not excluded:
+        exclude_clause = re.search(
+            r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای|except|excluding|exclude)\s*(.*)$",
+            original, flags=re.I,
+        )
+        excluded = _extract_domains(exclude_clause.group(1)) if exclude_clause else []
 
     content_types = supplied.get("content_types")
     if not isinstance(content_types, list):
