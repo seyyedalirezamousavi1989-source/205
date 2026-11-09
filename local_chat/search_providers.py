@@ -208,3 +208,69 @@ def search_google_keyless(query):
     if not results:
         raise SearchProviderError("گوگل نتیجه‌ای که قابل خواندن باشد برنگرداند.")
     return results
+
+def search_bing_rss(query):
+    """Keyless Bing RSS adapter. It is a best-effort public endpoint, not a guaranteed API."""
+    from xml.etree import ElementTree
+
+    params = urlencode({"q": query, "format": "rss", "setlang": language_for(query)})
+    request = Request(
+        "https://www.bing.com/search?" + params,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/xml, text/xml"},
+    )
+    try:
+        with urlopen(request, timeout=12) as response:
+            raw = response.read(MAX_RESPONSE_BYTES)
+    except HTTPError as exc:
+        raise SearchProviderError("Bing RSS خطا داد (HTTP %d)." % exc.code) from None
+    except (URLError, TimeoutError, OSError):
+        raise SearchProviderError("اتصال به Bing RSS برقرار نشد.") from None
+    try:
+        root = ElementTree.fromstring(raw)
+    except ElementTree.ParseError:
+        raise SearchProviderError("پاسخ Bing RSS معتبر نیست.") from None
+    rows = []
+    for node in root.findall(".//item"):
+        title = node.findtext("title") or ""
+        url = node.findtext("link") or ""
+        snippet = node.findtext("description") or ""
+        if url:
+            rows.append({"title": title, "url": url, "snippet": snippet})
+        if len(rows) >= MAX_RESULTS:
+            break
+    return _clean(rows)
+
+
+def search_searxng(query, instance_url, language=None, categories=None):
+    """Query a user-configured SearXNG instance; public instances may disable JSON output."""
+    from urllib.parse import urlsplit, urlunsplit
+
+    base = str(instance_url or "").strip().rstrip("/")
+    parts = urlsplit(base)
+    if parts.scheme != "https" or not parts.hostname or parts.username or parts.password:
+        raise SearchProviderError("آدرس SearXNG باید یک نشانی HTTPS معتبر باشد.")
+    params = {"q": query, "format": "json", "language": language or language_for(query), "safesearch": "1"}
+    if categories:
+        params["categories"] = categories
+    request = Request(
+        base + "/search?" + urlencode(params),
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+    )
+    try:
+        with urlopen(request, timeout=12) as response:
+            raw = response.read(MAX_RESPONSE_BYTES)
+    except HTTPError as exc:
+        raise SearchProviderError("SearXNG خطا داد (HTTP %d؛ ممکن است خروجی JSON غیرفعال باشد)." % exc.code) from None
+    except (URLError, TimeoutError, OSError):
+        raise SearchProviderError("اتصال به نمونهٔ SearXNG برقرار نشد.") from None
+    try:
+        data = json.loads(raw.decode("utf-8", errors="replace"))
+    except ValueError:
+        raise SearchProviderError("پاسخ SearXNG JSON معتبر نیست.") from None
+    results = data.get("results") if isinstance(data, dict) else None
+    if not isinstance(results, list):
+        raise SearchProviderError("ساختار پاسخ SearXNG معتبر نیست.")
+    return _clean(
+        {"title": item.get("title"), "url": item.get("url"), "snippet": item.get("content")}
+        for item in results if isinstance(item, dict)
+    )
