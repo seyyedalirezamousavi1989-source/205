@@ -77,7 +77,7 @@ MAX_BODY_SIZE = 2 * 1024 * 1024
 # namespaced models («user/model:tag», «hf.co/…») are valid Ollama names too
 MODEL_PATTERN = re.compile(r"^(?!.*\.\.)(?!.*//)[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$")
 MAX_SEARCH_QUERY_LENGTH = 500
-MAX_SEARCH_RESULTS = 8
+MAX_SEARCH_RESULTS = 12
 MAX_PAGE_BYTES = 1_000_000
 MAX_PAGE_TEXT = 3000
 APP_VERSION = version_info.APP_VERSION
