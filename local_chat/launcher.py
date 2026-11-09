@@ -1,5 +1,7 @@
 import ctypes
 import json
+import os
+import traceback
 import shutil
 import socket
 import subprocess
@@ -27,6 +29,23 @@ CHAT_URL = "http://127.0.0.1:8000/"
 STATUS_URL = "http://127.0.0.1:8000/api/status"
 OLLAMA_URL = "http://127.0.0.1:11434/api/tags"
 STARTUP_TIMEOUT = 60
+SERVER_STARTUP_TIMEOUT = 30
+
+
+def startup_log_path():
+    """Return a per-user log path that is writable in installed builds."""
+    root = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local")))
+    log_dir = root / "LocalChat" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "server_startup.log"
+
+
+def read_startup_log(max_chars=6000):
+    try:
+        content = startup_log_path().read_text(encoding="utf-8", errors="replace")
+        return content[-max_chars:].strip()
+    except OSError:
+        return "(گزارش شروع سرور قابل خواندن نیست.)"
 
 
 def show_error(message):
@@ -101,26 +120,55 @@ def start_chat_server():
             "درگاه ۸۰۰۰ توسط برنامهٔ دیگری استفاده شده است. آن برنامه را ببندید و دوباره تلاش کنید."
         )
 
-    # In a PyInstaller build, sys.executable is LocalChat.exe, not python.exe.
-    # Relaunch the frozen application in its server mode instead of passing
-    # server.py as a script (which would simply reopen the GUI launcher).
+    # In a frozen build, the executable relaunches itself in server mode.
     command = (
         [sys.executable, "--localchat-server"]
         if getattr(sys, "frozen", False)
         else [sys.executable, str(SERVER_FILE)]
     )
-    subprocess.Popen(
-        command,
-        cwd=APP_DIR,
-        creationflags=subprocess.CREATE_NEW_CONSOLE,
-    )
-    deadline = time.monotonic() + 20
+    log_path = startup_log_path()
+    try:
+        log_handle = log_path.open("a", encoding="utf-8", errors="replace")
+        log_handle.write(
+            f"\n--- LocalChat server start {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n"
+        )
+        log_handle.flush()
+        try:
+            process = subprocess.Popen(
+                command,
+                cwd=APP_DIR,
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                close_fds=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                if getattr(sys, "frozen", False)
+                else getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+            )
+        finally:
+            log_handle.close()
+    except OSError as error:
+        raise RuntimeError(
+            f"پردازش سرور ساخته نشد: {error}\nگزارش: {log_path}"
+        ) from error
+
+    deadline = time.monotonic() + SERVER_STARTUP_TIMEOUT
     while time.monotonic() < deadline:
         if chat_server_is_running():
             return
+        exit_code = process.poll()
+        if exit_code is not None:
+            details = read_startup_log()
+            raise RuntimeError(
+                f"سرور بلافاصله متوقف شد (کد خروج: {exit_code}).\n"
+                f"گزارش خطا: {log_path}\n\n{details}"
+            )
         time.sleep(0.25)
+
+    details = read_startup_log()
     raise RuntimeError(
-        "سرور چت اجرا نشد. مطمئن شوید فایل‌های برنامه کامل از ZIP استخراج شده‌اند."
+        f"سرور در {SERVER_STARTUP_TIMEOUT} ثانیه آماده نشد.\n"
+        f"گزارش خطا: {log_path}\n\n{details}"
     )
 
 
@@ -137,9 +185,12 @@ def main():
 
 if __name__ == "__main__":
     if "--localchat-server" in sys.argv:
-        # This path is used only by the frozen executable's child process.
-        from local_chat.server import main as server_main
-
-        server_main()
+        # Log even import-time failures; the parent redirects stdout/stderr here.
+        try:
+            from local_chat.server import main as server_main
+            server_main()
+        except BaseException:
+            traceback.print_exc()
+            raise
     else:
         raise SystemExit(main())
