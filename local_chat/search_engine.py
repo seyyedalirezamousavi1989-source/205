@@ -21,7 +21,7 @@ USER_AGENT = (
 )
 TIMEOUT = 12
 MAX_RESULTS = 8
-MAX_QUERIES = 6
+MAX_QUERIES = 8
 MAX_BYTES = 2 * 1024 * 1024
 CACHE_TTL = 180
 _CACHE = {}
@@ -217,6 +217,8 @@ def _provider_calls(query, config, ddg_search, constraints=None):
         raise SearchError("برای انتخاب مستقیم Brave باید کلید API تنظیم شود.")
     if engine == "searxng" and not config.get("searxng_url"):
         raise SearchError("برای انتخاب مستقیم SearXNG باید نشانی نمونهٔ آن در تنظیمات ثبت شود.")
+    if engine not in ("auto", "duckduckgo") and not any(name == "DuckDuckGo" for name, _ in calls):
+        calls.append(("DuckDuckGo", lambda q=query: ddg_search(q)))
     return calls
 
 
@@ -230,8 +232,7 @@ def _query_plan(query, kind, constraints=None):
         queries.extend(f"site:{domain} {q}" for domain in domains)
     elif constraints.get("region") == "IR":
         iran_domains = (
-            "digikala.com", "torob.com", "emalls.ir", "technolife.ir",
-            "lioncomputer.com", "meghdadit.com", "shahrcomputer.com", "zarebin.ir",
+            "digikala.com", "torob.com", "emalls.ir", "technolife.ir", "zarebin.ir", "gerdoo.me",
         )
         queries.extend(f"site:{domain} {q}" for domain in iran_domains)
         queries.append(f"site:.ir {q}")
