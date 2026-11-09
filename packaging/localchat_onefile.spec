@@ -53,7 +53,7 @@ except Exception:
 
 
 a = Analysis(
-    [os.path.join(ROOT, "localchat_app.py")],
+    [os.path.join(ROOT, "local_chat", "launcher.py")],
     pathex=[ROOT],
     datas=[
         *edge_datas,
