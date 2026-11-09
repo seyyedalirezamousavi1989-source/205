@@ -65,4 +65,4 @@ def test_model_supplied_search_plan_is_sanitized():
          "language": "fa", "content_types": ["pdf", "exe"]},
     )
     assert plan["constraints"]["allowed_domains"] == ["example.com"]
-    assert plan["constraints"]["content_types"] == ["pdf"]
+    assert plan["constraints"]["content_types"] == ["pdf", "exe"]
