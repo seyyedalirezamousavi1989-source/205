@@ -9,24 +9,33 @@ from urllib.parse import urlsplit
 _PERSIAN = re.compile(r"[\u0600-\u06FF]")
 _DOMAIN = re.compile(r"(?i)(?:https?://)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/[\w./%-]*)?")
 _ALIASES = {
-    "دیجی کالا": "digikala.com",
-    "دیجی‌کالا": "digikala.com",
-    "ترب": "torob.com",
-    "ایمالز": "emalls.ir",
-    "تکنولایف": "technolife.ir",
-    "لیون کامپیوتر": "lioncomputer.com",
-    "آپارات": "aparat.com",
-    "یوتیوب": "youtube.com",
-    "ذره بین": "zarebin.ir",
-    "ذره‌بین": "zarebin.ir",
-    "گردو": "gerdoo.me",
+    "دیجی کالا": "digikala.com", "دیجی‌کالا": "digikala.com", "digikala": "digikala.com",
+    "ترب": "torob.com", "torob": "torob.com",
+    "ایمالز": "emalls.ir", "emalls": "emalls.ir",
+    "تکنولایف": "technolife.ir", "technolife": "technolife.ir",
+    "لیون کامپیوتر": "lioncomputer.com", "lioncomputer": "lioncomputer.com",
+    "مقداد آی تی": "meghdadit.com", "meghdadit": "meghdadit.com",
+    "شهر کامپیوتر": "shahrcomputer.com", "shahrcomputer": "shahrcomputer.com",
+    "آپارات": "aparat.com", "aparat": "aparat.com",
+    "یوتیوب": "youtube.com", "youtube": "youtube.com",
+    "ذره بین": "zarebin.ir", "ذره‌بین": "zarebin.ir", "zarebin": "zarebin.ir",
+    "گردو": "gerdoo.me", "gerdoo": "gerdoo.me",
+}
+_KNOWN_FILE_EXTENSIONS = {
+    "pdf", "doc", "docx", "odt", "rtf", "xls", "xlsx", "ods", "csv",
+    "ppt", "pptx", "odp", "zip", "rar", "7z", "tar", "gz", "json", "xml",
+    "txt", "md", "epub", "mp3", "mp4", "wav", "jpg", "jpeg", "png", "gif",
+    "webp", "psd", "ai", "dwg", "dxf", "stl", "obj", "exe", "msi", "apk", "iso",
 }
 _FILE_EXTENSIONS = {
     "pdf": "pdf", "پی دی اف": "pdf", "پی‌دی‌اف": "pdf",
-    "docx": "docx", "word": "docx", "ورد": "docx",
-    "xlsx": "xlsx", "excel": "xlsx", "اکسل": "xlsx",
-    "pptx": "pptx", "powerpoint": "pptx",
-    "zip": "zip", "فایل": None, "فایل ها": None, "فایل‌ها": None,
+    "doc": "doc", "docx": "docx", "word": "docx", "ورد": "docx",
+    "odt": "odt", "rtf": "rtf",
+    "xls": "xls", "xlsx": "xlsx", "excel": "xlsx", "اکسل": "xlsx", "csv": "csv",
+    "ppt": "ppt", "pptx": "pptx", "powerpoint": "pptx",
+    "zip": "zip", "rar": "rar", "7z": "7z", "json": "json", "xml": "xml",
+    "txt": "txt", "md": "md", "epub": "epub", "mp3": "mp3", "mp4": "mp4",
+    "فایل": None, "فایل ها": None, "فایل‌ها": None, "سند": None, "اسناد": None,
 }
 
 
@@ -94,11 +103,15 @@ def parse_search_request(raw_query, supplied=None):
     if not isinstance(content_types, list):
         content_types = []
     else:
-        content_types = [str(x).lower() for x in content_types if str(x).lower() in {"pdf", "docx", "xlsx", "pptx", "zip"}]
+        content_types = [str(x).lower() for x in content_types
+                         if re.fullmatch(r"[a-z0-9]{2,8}", str(x).lower())
+                         and str(x).lower() in _KNOWN_FILE_EXTENSIONS]
+    file_search = bool(re.search(r"(?:\\bfiles?\\b|\\bdocuments?\\b|فایل|اسناد?|مدارک)", lower))
     for term, kind in _FILE_EXTENSIONS.items():
-        if term in lower:
-            if kind and kind not in content_types:
-                content_types.append(kind)
+        if term in lower and kind and kind not in content_types:
+            content_types.append(kind)
+    if content_types:
+        file_search = True
     if re.search(r"\b(?:filetype:)?(?:pdf|docx|xlsx|pptx|zip)\b", lower):
         for ext in ("pdf", "docx", "xlsx", "pptx", "zip"):
             if re.search(r"\b" + ext + r"\b", lower) and ext not in content_types:
@@ -118,6 +131,9 @@ def parse_search_request(raw_query, supplied=None):
     ]
     for pattern in patterns:
         query = re.sub(pattern, " ", query, flags=re.I)
+    if only_site:
+        query = re.sub(r"(?:فقط|صرفا|صرفاً)\\s*(?:در\\s*)?(?:" + alias_pattern + r")", " ", query, flags=re.I)
+        query = re.sub(r"\\bonly\\s+(?:on\\s+)?(?:" + alias_pattern + r")\\b", " ", query, flags=re.I)
     if only_site or exclude_site:
         for raw in _DOMAIN.findall(original):
             query = query.replace(raw, " ")
@@ -140,7 +156,7 @@ def parse_search_request(raw_query, supplied=None):
             "region": "IR" if iran_only else supplied.get("region"),
             "allowed_domains": allowed,
             "excluded_domains": excluded,
-            "content_types": content_types,
+            "content_types": content_types,\n            "file_search": file_search,
         },
         "strict_domains": bool(only_site or supplied.get("strict_domains")),
         "strategy": str(supplied.get("strategy") or "auto"),
@@ -175,7 +191,15 @@ def result_matches_constraints(item, constraints):
                          "meghdadit.com", "shahrcomputer.com", "zarebin.ir", "gerdoo.me")
         if not (host.endswith(".ir") or any(host == d or host.endswith("." + d) for d in iranian_hosts)):
             return False
+    file_search = bool(constraints.get("file_search"))
     types = constraints.get("content_types") or []
+    if file_search:
+        path = urlsplit(item.get("url", "")).path.lower()
+        mime = str(item.get("mime_type") or "").lower()
+        if not any(path.endswith("." + ext) for ext in _KNOWN_FILE_EXTENSIONS) and not (
+            mime.startswith(("application/", "audio/", "video/", "image/")) and mime != "application/xhtml+xml"
+        ):
+            return False
     if types:
         path = urlsplit(item.get("url", "")).path.lower()
         if not any(path.endswith("." + ext) for ext in types):
