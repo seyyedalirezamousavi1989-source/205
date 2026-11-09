@@ -359,7 +359,7 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, 
     all_rows.extend(base_rows)
     errors.extend(base_errors)
 
-
+    providers_with_hits = list(dict.fromkeys(name for name, _row in all_rows))
     targeted_provider = max(
         providers_with_hits or ["DuckDuckGo"],
         key=lambda name: _provider_score(name, language),
