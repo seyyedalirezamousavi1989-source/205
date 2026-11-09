@@ -25,6 +25,15 @@ def test_normalizer_only_accepts_real_http_links_and_marks_product_pages():
     assert item["verified"] is False
 
 
+def test_direct_downloads_are_labeled_as_files():
+    item = search_engine._normalize_item(
+        {"title": "Research paper", "url": "https://example.com/paper.pdf"},
+        "Bing RSS", "research paper", "web",
+    )
+    assert item["link_type"] == "file"
+    assert item["file_type"] == "pdf"
+
+
 def test_product_search_uses_targeted_queries_and_never_invents_urls(monkeypatch):
     search_engine._CACHE.clear()
     monkeypatch.setattr(search_engine.search_providers, "search_bing_rss", lambda _q: [])
