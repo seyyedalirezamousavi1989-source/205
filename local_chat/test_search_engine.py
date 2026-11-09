@@ -61,6 +61,24 @@ def test_video_search_expands_to_aparat_and_preserves_provider_url(monkeypatch):
     assert result["results"][0]["link_type"] == "video"
 
 
+def test_explicit_site_filter_is_strict_and_dynamic(monkeypatch):
+    search_engine._CACHE.clear()
+    monkeypatch.setattr(search_engine.search_providers, "search_bing_rss", lambda _q: [])
+    seen = []
+    def ddg(query):
+        seen.append(query)
+        return [
+            {"title": "Allowed", "url": "https://shop.example.com/product/1", "snippet": "RTX 5070"},
+            {"title": "Other", "url": "https://other.example.org/product/2", "snippet": "RTX 5070"},
+        ]
+    result = search_engine.search(
+        "قیمت RTX 5070 فقط سایت example.com",
+        {"engine": "auto"}, ddg,
+    )
+    assert any("site:example.com" in q for q in seen)
+    assert [row["url"] for row in result["results"]] == ["https://shop.example.com/product/1"]
+
+
 def test_empty_search_does_not_call_provider():
     with pytest.raises(search_engine.SearchError):
         search_engine.search("   ", {"engine": "auto"}, lambda _q: pytest.fail("must not search"))
