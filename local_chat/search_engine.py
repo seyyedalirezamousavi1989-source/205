@@ -9,6 +9,7 @@ import ipaddress
 import json
 import re
 import time
+import threading
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
@@ -192,33 +193,77 @@ def search_brave(query, api_key, limit=8):
     ]
 
 
+_PROVIDER_STATS = {}
+_STATS_LOCK = threading.Lock()
+_PROVIDER_PRIOR = {
+    "SearXNG": 0.72, "Bing RSS": 0.67, "DuckDuckGo": 0.62,
+    "Google / Serper": 0.60, "Brave Search": 0.60, "Google CSE": 0.55,
+}
+
+
+def _record_provider(name, language, ok, elapsed, result_count):
+    key = (name, language or "unknown")
+    with _STATS_LOCK:
+        state = _PROVIDER_STATS.setdefault(key, {
+            "successes": 0, "failures": 0, "latency": max(0.1, elapsed), "results": 0.0,
+        })
+        state["successes" if ok else "failures"] += 1
+        state["latency"] = 0.7 * state["latency"] + 0.3 * max(0.01, elapsed)
+        state["results"] = 0.7 * state["results"] + 0.3 * max(0, result_count)
+
+
+def _provider_score(name, language):
+    with _STATS_LOCK:
+        state = _PROVIDER_STATS.get((name, language or "unknown"))
+        if not state:
+            return _PROVIDER_PRIOR.get(name, 0.5)
+        total = state["successes"] + state["failures"]
+        reliability = state["successes"] / max(1, total)
+        volume = min(1.0, state["results"] / 5.0)
+        latency_bonus = 1.0 / (1.0 + state["latency"] / 8.0)
+        return 0.55 * reliability + 0.30 * volume + 0.15 * latency_bonus
+
+
 def _provider_calls(query, config, ddg_search, constraints=None):
-    """Build a small adaptive provider set; keyless sources are first-class."""
+    """Free providers are tried first; paid APIs are a fallback, not the default."""
     constraints = constraints or {}
     engine = config.get("engine", "auto")
+    language = constraints.get("language") or ("fa" if _PERSIAN.search(query) else "en")
     calls = []
     if engine in ("auto", "duckduckgo"):
         calls.append(("DuckDuckGo", lambda q=query: ddg_search(q)))
     if engine == "auto":
         calls.append(("Bing RSS", lambda q=query: search_providers.search_bing_rss(q)))
     if engine in ("auto", "searxng") and config.get("searxng_url"):
-        language = constraints.get("language") or ("fa" if _PERSIAN.search(query) else "en")
         calls.append(("SearXNG", lambda q=query: search_providers.search_searxng(
             q, config["searxng_url"], language=language)))
-    if engine in ("auto", "google"):
-        if config.get("serper_api_key"):
+    if engine in ("google", "brave"):
+        if config.get("serper_api_key") and engine == "google":
             calls.append(("Google / Serper", lambda q=query: search_providers.search_serper(q, config["serper_api_key"])))
-        if config.get("google_api_key") and config.get("google_cx"):
+        if config.get("google_api_key") and config.get("google_cx") and engine == "google":
             calls.append(("Google CSE", lambda q=query: search_providers.search_google_cse(
                 q, config["google_api_key"], config["google_cx"])))
-    if engine in ("auto", "google", "brave") and config.get("brave_api_key"):
-        calls.append(("Brave Search", lambda q=query: search_brave(q, config["brave_api_key"])))
+        if config.get("brave_api_key") and engine in ("google", "brave"):
+            calls.append(("Brave Search", lambda q=query: search_brave(q, config["brave_api_key"])))
     if engine == "brave" and not config.get("brave_api_key"):
         raise SearchError("برای انتخاب مستقیم Brave باید کلید API تنظیم شود.")
     if engine == "searxng" and not config.get("searxng_url"):
         raise SearchError("برای انتخاب مستقیم SearXNG باید نشانی نمونهٔ آن در تنظیمات ثبت شود.")
     if engine not in ("auto", "duckduckgo") and not any(name == "DuckDuckGo" for name, _ in calls):
         calls.append(("DuckDuckGo", lambda q=query: ddg_search(q)))
+    return calls
+
+
+def _paid_provider_calls(query, config):
+    """Optional paid/keyed sources, invoked only if the free pass is weak."""
+    calls = []
+    if config.get("serper_api_key"):
+        calls.append(("Google / Serper", lambda q=query: search_providers.search_serper(q, config["serper_api_key"])))
+    if config.get("google_api_key") and config.get("google_cx"):
+        calls.append(("Google CSE", lambda q=query: search_providers.search_google_cse(
+            q, config["google_api_key"], config["google_cx"])))
+    if config.get("brave_api_key"):
+        calls.append(("Brave Search", lambda q=query: search_brave(q, config["brave_api_key"])))
     return calls
 
 
@@ -232,7 +277,8 @@ def _query_plan(query, kind, constraints=None):
         queries.extend(f"site:{domain} {q}" for domain in domains)
     elif constraints.get("region") == "IR":
         iran_domains = (
-            "digikala.com", "torob.com", "emalls.ir", "technolife.ir", "zarebin.ir", "gerdoo.me",
+            "digikala.com", "torob.com", "emalls.ir", "technolife.ir",
+            "meghdadit.com", "shahrcomputer.com",
         )
         queries.extend(f"site:{domain} {q}" for domain in iran_domains)
         queries.append(f"site:.ir {q}")
@@ -244,21 +290,28 @@ def _query_plan(query, kind, constraints=None):
         queries[0] += f" filetype:{ext}"
     return list(dict.fromkeys(queries))[:MAX_QUERIES]
 
-def _run_query(calls):
-    """Run available providers concurrently; failures are isolated and never abort a search."""
-    results = []
-    errors = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(calls) or 1)) as pool:
-        future_map = {pool.submit(call): name for name, call in calls}
-        for future in concurrent.futures.as_completed(future_map):
-            name = future_map[future]
+
+def _run_query(calls, language=None):
+    """Run providers concurrently and learn their reliability/latency/result yield."""
+    results, errors, successful = [], [], []
+    if not calls:
+        return results, errors, successful
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(calls))) as pool:
+        submitted = {}
+        for name, call in calls:
+            submitted[pool.submit(call)] = (name, time.monotonic())
+        for future in concurrent.futures.as_completed(submitted):
+            name, started = submitted[future]
+            elapsed = time.monotonic() - started
             try:
                 rows = future.result() or []
-                for row in rows:
-                    results.append((name, row))
+                successful.append(name)
+                _record_provider(name, language, True, elapsed, len(rows))
+                results.extend((name, row) for row in rows)
             except Exception as exc:
+                _record_provider(name, language, False, elapsed, 0)
                 errors.append(f"{name}: {str(exc)[:180]}")
-    return results, errors
+    return results, errors, successful
 
 
 def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, search_options=None):
@@ -290,13 +343,29 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, 
     all_rows, errors = [], []
     query_plan = _query_plan(query, kind, constraints)
     base_calls = _provider_calls(query_plan[0], config, ddg_search, constraints)
-    base_rows, base_errors = _run_query(base_calls)
+    language = constraints.get("language") or ("fa" if _PERSIAN.search(query) else "en")
+    base_rows, base_errors, successful = _run_query(base_calls, language)
     all_rows.extend(base_rows)
     errors.extend(base_errors)
 
-    successful = [name for name, _ in base_rows]
-    preferred = ("SearXNG", "Bing RSS", "DuckDuckGo", "Google / Serper", "Brave Search", "Google CSE")
-    targeted_provider = next((name for name in preferred if name in successful), "DuckDuckGo")
+    # Paid APIs are not touched unless the free pass produces fewer than three usable hits.
+    preliminary = []
+    for provider, row in base_rows:
+        item = _normalize_item(row, provider, query, kind)
+        if item and search_plan.result_matches_constraints(item, constraints):
+            preliminary.append(item)
+    if config.get("engine", "auto") == "auto" and len(_dedupe(preliminary)) < 3:
+        paid_calls = _paid_provider_calls(query, config)
+        if paid_calls:
+            paid_rows, paid_errors, paid_successful = _run_query(paid_calls, language)
+            all_rows.extend(paid_rows)
+            errors.extend(paid_errors)
+            successful.extend(paid_successful)
+
+    targeted_provider = max(
+        dict.fromkeys(successful or ["DuckDuckGo"]),
+        key=lambda name: _provider_score(name, language),
+    )
     if len(query_plan) > 1 and targeted_provider:
         targeted_calls = []
         for targeted_query in query_plan[1:]:
@@ -314,7 +383,7 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, 
                     return search_providers.search_google_cse(q, config["google_api_key"], config["google_cx"])
                 return ddg_search(q)
             targeted_calls.append((targeted_provider, call_targeted))
-        targeted_rows, targeted_errors = _run_query(targeted_calls)
+        targeted_rows, targeted_errors, _targeted_successful = _run_query(targeted_calls, language)
         all_rows.extend(targeted_rows)
         errors.extend(targeted_errors)
 
