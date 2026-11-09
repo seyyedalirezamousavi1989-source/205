@@ -296,7 +296,7 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, 
 
     successful = [name for name, _ in base_rows]
     preferred = ("SearXNG", "Bing RSS", "DuckDuckGo", "Google / Serper", "Brave Search", "Google CSE")
-    targeted_provider = next((name for name in preferred if name in successful), "")
+    targeted_provider = next((name for name in preferred if name in successful), "DuckDuckGo")
     if len(query_plan) > 1 and targeted_provider:
         targeted_calls = []
         for targeted_query in query_plan[1:]:
