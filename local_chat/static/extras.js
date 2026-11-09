@@ -591,7 +591,7 @@ function showSearchSettings(search) {
   if (search.engine === "auto") parts.push("حالت خودکار: ترکیب موتورهای در دسترس");
   if (search.has_serper_key) parts.push("Serper فعال");
   if (search.has_brave_key) parts.push("Brave فعال");
-  if (search.has_searxng parts.push("SearXNG تنظیم شده");
+  if (search.has_searxng) parts.push("SearXNG تنظیم شده");
   if (!search.has_serper_key && !search.has_brave_key && !search.has_google_cse) {
     parts.push("بدون کلید: جست‌وجوی رایگان با پوشش محدودتر");
   }
