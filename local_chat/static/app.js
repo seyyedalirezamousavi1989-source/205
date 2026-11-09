@@ -875,7 +875,10 @@ function wantsMediaSearch(query) {
 
 function shouldAutoSearchWeb(query) {
   if (wantsMediaSearch(query)) return true;
-  return /(?:آخرین\s+(?:خبر|اخبار|قیمت|نسخه)|جدیدترین|امروز|امشب|اکنون|در حال حاضر|قیمت روز|نرخ ارز|قیمت فعلی|آب\s*و\s*هوا|وضعیت فعلی|اخبار|خبرهای\s+(?:امروز|جدید|روز)|نتایج زنده|latest|current|today|tonight|weather|live score|exchange rate)/i.test(query);
+  if (/(?:سرچ\\s*کن|جست[\\u200c\\s]*و[\\u200c\\s]*جو\\s*کن|بگرد|پیدا\\s*کن|بیاب|در\\s+اینترنت\\s+بگرد|توی\\s+اینترنت\\s+بگرد|وب\\s+را\\s+بگرد|search\\s+(?:the\\s+web|for)|find\\s+(?:me\\s+)?)/i.test(query)) return true;
+  if (/(?:قیمت|موجودی|خرید)\\s+.{2,}|(?:قیمت|موجودی)\\s*(?:گوشی|کارت\\s*گرافیک|لپ\\s*تاپ|تبلت|هدفون|دوربین|کنسول|تلویزیون)|\\b(?:rtx|gtx|iphone|ipad|macbook|galaxy|ps5|xbox)\\b/i.test(query)) return true;
+  if (/(?:فایل|اسناد?|مدارک|\\bpdf\\b|\\bdocx?\\b|\\bxlsx?\\b|\\bpptx?\\b|\\bzip\\b).*(?:پیدا|جستجو|سرچ|دانلود|لینک)|(?:پیدا|جستجو|سرچ|دانلود|لینک).*(?:فایل|اسناد?|مدارک|\\bpdf\\b|\\bdocx?\\b|\\bxlsx?\\b|\\bpptx?\\b|\\bzip\\b)/i.test(query)) return true;
+  return /(?:آخرین\\s+(?:خبر|اخبار|قیمت|نسخه)|جدیدترین|امروز|امشب|اکنون|در حال حاضر|قیمت روز|نرخ ارز|قیمت فعلی|آب\\s*و\\s*هوا|وضعیت فعلی|اخبار|خبرهای\\s+(?:امروز|جدید|روز)|نتایج زنده|latest|current|today|tonight|weather|live score|exchange rate)/i.test(query);
 }
 
 function preflightSend(text) {
