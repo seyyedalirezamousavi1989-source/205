@@ -72,52 +72,59 @@ def _extract_domains(text):
 
 
 def parse_search_request(raw_query, supplied=None):
-    """Return {query, constraints, strict_domains, strategy}; accepts optional model plan."""
+    """Translate natural-language restrictions and optional model arguments into a safe plan."""
     original = _norm(raw_query)[:1000]
     supplied = supplied if isinstance(supplied, dict) else {}
     lower = original.casefold()
+    alias_pattern = "|".join(re.escape(name) for name in _ALIASES)
 
-    allowed = supplied.get("allowed_domains")
-    excluded = supplied.get("excluded_domains")
-    allowed = [_domain(x) for x in allowed] if isinstance(allowed, list) else []
-    excluded = [_domain(x) for x in excluded] if isinstance(excluded, list) else []
+    only_site = bool(
+        re.search(r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:سایت|دامنه|وبسایت|وب\s*سایت)|only\s+(?:the\s+)?(?:site|domain|website)", lower)
+        or re.search(r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:" + alias_pattern + r")", lower)
+        or re.search(r"only\s+(?:on\s+)?(?:" + alias_pattern + r")", lower)
+    )
+    exclude_site = bool(re.search(
+        r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای)|(?:except|excluding|exclude)", lower
+    ))
+    fa_only = bool(re.search(
+        r"(?:فقط|صرفا|صرفاً)\s*(?:سایت(?:های|\s*های)?|منابع?)\s*فارسی|"
+        r"(?:سایت(?:های|\s*های)?|منابع?)\s*فارسی\s*(?:فقط|باشه|باشد)|"
+        r"only\s+persian\s+(?:sites|sources)", lower
+    ))
+    iran_only = bool(re.search(
+        r"(?:فقط|صرفا|صرفاً)\s*(?:سایت(?:های|\s*های)?|فروشگاه(?:های|\s*های)?|منابع?)\s*ایرانی|"
+        r"(?:سایت(?:های|\s*های)?|فروشگاه(?:های|\s*های)?|منابع?)\s*ایرانی\s*(?:فقط|باشه|باشد)|"
+        r"iranian\s+(?:sites|stores|sources)\s+only", lower
+    ))
+    only_site = only_site and not (fa_only or iran_only)
 
-    only_site = bool(re.search(r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:سایت|دامنه|وبسایت|وب\s*سایت)|only\s+(?:the\s+)?(?:site|domain|website)", lower))
-    exclude_site = bool(re.search(r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای)|(?:except|excluding|exclude)", lower))
     mentioned_domains = _extract_domains(original)
+    allowed_raw = supplied.get("allowed_domains")
+    excluded_raw = supplied.get("excluded_domains")
+    allowed = [_domain(x) for x in allowed_raw] if isinstance(allowed_raw, list) else []
+    excluded = [_domain(x) for x in excluded_raw] if isinstance(excluded_raw, list) else []
     if only_site and not allowed and mentioned_domains:
         allowed = mentioned_domains
     if exclude_site and not excluded and mentioned_domains:
         excluded = mentioned_domains
 
-    fa_only = bool(re.search(
-        r"(?:فقط|صرفا|صرفاً)\s*(?:سایت(?:های|\s*های)?|منابع?)\s*فارسی|"
-        r"(?:سایت(?:های|\s*های)?|منابع?)\s*فارسی\s*(?:فقط|باشه|باشد)|"
-        r"only\s+persian\s+(?:sites|sources)", lower))
-    iran_only = bool(re.search(
-        r"(?:فقط|صرفا|صرفاً)\s*(?:سایت(?:های|\s*های)?|فروشگاه(?:های|\s*های)?|منابع?)\s*ایرانی|"
-        r"(?:سایت(?:های|\s*های)?|فروشگاه(?:های|\s*های)?|منابع?)\s*ایرانی\s*(?:فقط|باشه|باشد)|"
-        r"iranian\s+(?:sites|stores|sources)\s+only", lower))\n    only_site = only_site and not (fa_only or iran_only)
-
     content_types = supplied.get("content_types")
     if not isinstance(content_types, list):
         content_types = []
-    else:
-        content_types = [str(x).lower() for x in content_types
-                         if re.fullmatch(r"[a-z0-9]{2,8}", str(x).lower())
-                         and str(x).lower() in _KNOWN_FILE_EXTENSIONS]
-    file_search = bool(re.search(r"(?:\\bfiles?\\b|\\bdocuments?\\b|فایل|اسناد?|مدارک)", lower))
-    for term, kind in _FILE_EXTENSIONS.items():
-        if term in lower and kind and kind not in content_types:
-            content_types.append(kind)
+    content_types = [
+        str(x).lower() for x in content_types
+        if str(x).lower() in _KNOWN_FILE_EXTENSIONS
+    ]
+    file_search = bool(re.search(r"\bfiles?\b|\bdocuments?\b|فایل|اسناد?|مدارک", lower))
+    for term, extension in _FILE_EXTENSIONS.items():
+        if term in lower and extension and extension not in content_types:
+            content_types.append(extension)
+    for extension in _KNOWN_FILE_EXTENSIONS:
+        if re.search(r"\b" + re.escape(extension) + r"\b", lower) and extension not in content_types:
+            content_types.append(extension)
     if content_types:
         file_search = True
-    if re.search(r"\b(?:filetype:)?(?:pdf|docx|xlsx|pptx|zip)\b", lower):
-        for ext in ("pdf", "docx", "xlsx", "pptx", "zip"):
-            if re.search(r"\b" + ext + r"\b", lower) and ext not in content_types:
-                content_types.append(ext)
 
-    # Remove only recognized constraint clauses; preserve the subject and quoted phrases.
     query = original
     patterns = [
         r"(?:فقط|صرفا|صرفاً)\s*(?:سایت(?:های|\s*های)?|منابع?)\s*(?:فارسی|ایرانی)",
@@ -132,8 +139,11 @@ def parse_search_request(raw_query, supplied=None):
     for pattern in patterns:
         query = re.sub(pattern, " ", query, flags=re.I)
     if only_site:
-        query = re.sub(r"(?:فقط|صرفا|صرفاً)\\s*(?:در\\s*)?(?:" + alias_pattern + r")", " ", query, flags=re.I)
-        query = re.sub(r"\\bonly\\s+(?:on\\s+)?(?:" + alias_pattern + r")\\b", " ", query, flags=re.I)
+        query = re.sub(r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:" + alias_pattern + r")", " ", query, flags=re.I)
+        query = re.sub(r"only\s+(?:on\s+)?" + r"(?:" + alias_pattern + r")", " ", query, flags=re.I)
+    if exclude_site:
+        query = re.sub(r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای)\s*(?:سایت\s*)?(?:" + alias_pattern + r")", " ", query, flags=re.I)
+        query = re.sub(r"(?:except|excluding|exclude)\s+(?:" + alias_pattern + r")", " ", query, flags=re.I)
     if only_site or exclude_site:
         for raw in _DOMAIN.findall(original):
             query = query.replace(raw, " ")
@@ -144,19 +154,24 @@ def parse_search_request(raw_query, supplied=None):
     if len(query) < 2:
         query = original
 
-    if not allowed and isinstance(supplied.get("allowed_domains"), list):
-        allowed = [_domain(x) for x in supplied["allowed_domains"]]
     allowed = list(dict.fromkeys(x for x in allowed if x))
     excluded = list(dict.fromkeys(x for x in excluded if x and x not in allowed))
+    language = "fa" if fa_only else supplied.get("language")
+    if language not in ("fa", "en"):
+        language = None
+    region = "IR" if iran_only else supplied.get("region")
+    if region != "IR":
+        region = None
 
     return {
         "query": query[:500],
         "constraints": {
-            "language": "fa" if fa_only else supplied.get("language"),
-            "region": "IR" if iran_only else supplied.get("region"),
+            "language": language,
+            "region": region,
             "allowed_domains": allowed,
             "excluded_domains": excluded,
-            "content_types": content_types,\n            "file_search": file_search,
+            "content_types": content_types,
+            "file_search": file_search,
         },
         "strict_domains": bool(only_site or supplied.get("strict_domains")),
         "strategy": str(supplied.get("strategy") or "auto"),
