@@ -22,7 +22,7 @@ USER_AGENT = (
 )
 TIMEOUT = 12
 MAX_RESULTS = 8
-MAX_QUERIES = 8
+MAX_QUERIES = 10
 MAX_BYTES = 2 * 1024 * 1024
 CACHE_TTL = 180
 _CACHE = {}
@@ -43,6 +43,12 @@ _IRAN_STORES = (
     "emalls.ir",
     "technolife.ir",
     "lioncomputer.com",
+    "meghdadit.com",
+    "shahrcomputer.com",
+    "mobile140.com",
+    "kalatik.com",
+    "janebi.com",
+    "basalam.com",
 )
 _VIDEO_SITES = ("aparat.com/v", "youtube.com/watch", "namasha.com", "tamasha.com")
 
@@ -110,7 +116,8 @@ def _normalize_item(item, provider, query, kind):
     if kind == "product":
         if any(host == d or host.endswith("." + d) for d in (
             "digikala.com", "torob.com", "emalls.ir", "technolife.ir",
-            "lioncomputer.com", "meghdadit.com", "shahrcomputer.com"
+            "lioncomputer.com", "meghdadit.com", "shahrcomputer.com", "mobile140.com", "kalatik.com",
+            "janebi.com", "basalam.com"
         )):
             score += 0.16
         if product_path:
@@ -352,21 +359,7 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, 
     all_rows.extend(base_rows)
     errors.extend(base_errors)
 
-    # Paid APIs are not touched unless the free pass produces fewer than three usable hits.
-    preliminary = []
-    for provider, row in base_rows:
-        item = _normalize_item(row, provider, query, kind)
-        if item and search_plan.result_matches_constraints(item, constraints):
-            preliminary.append(item)
-    if config.get("engine", "auto") == "auto" and len(_dedupe(preliminary)) < 3:
-        paid_calls = _paid_provider_calls(query, config)
-        if paid_calls:
-            paid_rows, paid_errors, paid_successful = _run_query(paid_calls, language)
-            all_rows.extend(paid_rows)
-            errors.extend(paid_errors)
-            successful.extend(paid_successful)
 
-    providers_with_hits = list(dict.fromkeys(name for name, _row in all_rows))
     targeted_provider = max(
         providers_with_hits or ["DuckDuckGo"],
         key=lambda name: _provider_score(name, language),
@@ -391,6 +384,20 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, 
         targeted_rows, targeted_errors, _targeted_successful = _run_query(targeted_calls, language)
         all_rows.extend(targeted_rows)
         errors.extend(targeted_errors)
+
+    # Paid APIs are only consulted after free base + domain-targeted discovery remains weak.
+    preliminary = []
+    for provider, row in all_rows:
+        item = _normalize_item(row, provider, query, kind)
+        if item and search_plan.result_matches_constraints(item, constraints):
+            preliminary.append(item)
+    strong_hits = [item for item in _dedupe(preliminary) if item["match_score"] >= 0.35]
+    if config.get("engine", "auto") == "auto" and len(strong_hits) < 3:
+        paid_calls = _paid_provider_calls(query, config)
+        if paid_calls:
+            paid_rows, paid_errors, paid_successful = _run_query(paid_calls, language)
+            all_rows.extend(paid_rows)
+            errors.extend(paid_errors)
 
     normalized = []
     for provider, row in all_rows:
