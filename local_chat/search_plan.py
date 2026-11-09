@@ -88,7 +88,7 @@ def parse_search_request(raw_query, supplied=None):
     iran_only = bool(re.search(
         r"(?:فقط|صرفا|صرفاً)\\s*(?:سایت(?:های|\\s*های)?|فروشگاه(?:های|\\s*های)?|منابع?)\\s*ایرانی|"
         r"(?:سایت(?:های|\\s*های)?|فروشگاه(?:های|\\s*های)?|منابع?)\\s*ایرانی\\s*(?:فقط|باشه|باشد)|"
-        r"iranian\\s+(?:sites|stores|sources)\\s+only", lower))
+        r"iranian\\s+(?:sites|stores|sources)\\s+only", lower))\n    only_site = only_site and not (fa_only or iran_only)
 
     content_types = supplied.get("content_types")
     if not isinstance(content_types, list):
@@ -166,7 +166,7 @@ def result_matches_constraints(item, constraints):
     if language == "fa":
         sample = " ".join((item.get("title") or "", item.get("snippet") or "", item.get("content") or ""))
         letters = [c for c in sample if c.isalpha()]
-        if letters and sum(1 for c in letters if "\\u0600" <= c <= "\\u06ff") / len(letters) < 0.12:
+        if len(letters) >= 40 and sum(1 for c in letters if "\\u0600" <= c <= "\\u06ff") / len(letters) < 0.08:
             return False
     region = constraints.get("region")
     if region == "IR":
