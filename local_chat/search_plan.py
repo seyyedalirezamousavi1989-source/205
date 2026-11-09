@@ -50,7 +50,10 @@ def _domain(value):
         return ""
     if "://" not in value:
         value = "https://" + value
-    host = (urlsplit(value).hostname or "").lower().rstrip(".")
+    try:
+        host = (urlsplit(value).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return ""
     if not host or "." not in host or len(host) > 253:
         return ""
     if not re.fullmatch(r"[a-z0-9.-]+", host) or ".." in host:
