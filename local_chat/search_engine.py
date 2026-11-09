@@ -13,7 +13,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
-from . import search_providers
+from . import search_providers, search_plan
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -190,9 +190,19 @@ def search_brave(query, api_key, limit=8):
     ]
 
 
-def _provider_calls(query, config, ddg_search):
-    calls = []
+def _provider_calls(query, config, ddg_search, constraints=None):
+    """Build a small adaptive provider set; keyless sources are first-class."""
+    constraints = constraints or {}
     engine = config.get("engine", "auto")
+    calls = []
+    if engine in ("auto", "duckduckgo"):
+        calls.append(("DuckDuckGo", lambda q=query: ddg_search(q)))
+    if engine == "auto":
+        calls.append(("Bing RSS", lambda q=query: search_providers.search_bing_rss(q)))
+    if engine in ("auto", "searxng") and config.get("searxng_url"):
+        language = constraints.get("language") or ("fa" if _PERSIAN.search(query) else "en")
+        calls.append(("SearXNG", lambda q=query: search_providers.search_searxng(
+            q, config["searxng_url"], language=language)))
     if engine in ("auto", "google"):
         if config.get("serper_api_key"):
             calls.append(("Google / Serper", lambda q=query: search_providers.search_serper(q, config["serper_api_key"])))
@@ -201,20 +211,35 @@ def _provider_calls(query, config, ddg_search):
                 q, config["google_api_key"], config["google_cx"])))
     if engine in ("auto", "google", "brave") and config.get("brave_api_key"):
         calls.append(("Brave Search", lambda q=query: search_brave(q, config["brave_api_key"])))
-    calls.append(("DuckDuckGo", lambda q=query: ddg_search(q)))
+    if engine == "brave" and not config.get("brave_api_key"):
+        raise SearchError("برای انتخاب مستقیم Brave باید کلید API تنظیم شود.")
+    if engine == "searxng" and not config.get("searxng_url"):
+        raise SearchError("برای انتخاب مستقیم SearXNG باید نشانی نمونهٔ آن در تنظیمات ثبت شود.")
     return calls
 
 
-def _query_plan(query, kind):
+def _query_plan(query, kind, constraints=None):
+    """Expand only where intent/constraints justify it; never override an explicit site scope."""
+    constraints = constraints or {}
     q = _normal(query)
     queries = [q]
-    if kind == "product":
-        # Exact product pages on known Iranian retailers, not generic store home pages.
+    domains = list(constraints.get("allowed_domains") or [])
+    if domains:
+        queries.extend(f"site:{domain} {q}" for domain in domains)
+    elif constraints.get("region") == "IR":
+        iran_domains = (
+            "digikala.com", "torob.com", "emalls.ir", "technolife.ir",
+            "lioncomputer.com", "meghdadit.com", "shahrcomputer.com", "zarebin.ir",
+        )
+        queries.extend(f"site:{domain} {q}" for domain in iran_domains)
+        queries.append(f"site:.ir {q}")
+    elif kind == "product":
         queries.extend(f"site:{domain} {q}" for domain in _IRAN_STORES)
     elif kind == "video":
         queries.extend(f"site:{domain} {q}" for domain in _VIDEO_SITES)
-    return queries[:MAX_QUERIES]
-
+    for ext in constraints.get("content_types") or []:
+        queries[0] += f" filetype:{ext}"
+    return list(dict.fromkeys(queries))[:MAX_QUERIES]
 
 def _run_query(calls):
     """Run available providers concurrently; failures are isolated and never abort a search."""
@@ -233,13 +258,25 @@ def _run_query(calls):
     return results, errors
 
 
-def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
-    """Search and return a stable API payload. Only provider-returned URLs are emitted."""
-    query = _normal(query)[:500]
-    if not query:
+def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, search_options=None):
+    """Search using natural-language constraints; URLs always originate from providers."""
+    original_query = _normal(query)[:1000]
+    if not original_query:
         raise SearchError("عبارت جست‌وجو خالی است.")
+    plan = search_plan.parse_search_request(original_query, search_options)
+    query = _normal(plan["query"])[:500]
+    constraints = plan["constraints"]
+    if plan.get("strict_domains") and not constraints.get("allowed_domains"):
+        raise SearchError("برای جست‌وجوی محدود به یک سایت، نام دامنه یا نشانی سایت را هم مشخص کن.")
+    if len(query) < 2:
+        raise SearchError("عبارت جست‌وجوی قابل‌استفاده پس از اعمال محدودیت‌ها باقی نماند.")
     kind = classify(query)
-    cache_key = (query.casefold(), kind, config.get("engine", "auto"), str(config.get("serper_api_key") or "")[-4:], str(config.get("brave_api_key") or "")[-4:], str(config.get("google_api_key") or "")[-4:], str(config.get("google_cx") or ""))
+    cache_key = (
+        query.casefold(), kind, json.dumps(constraints, sort_keys=True, ensure_ascii=False),
+        config.get("engine", "auto"), str(config.get("searxng_url") or ""),
+        str(config.get("serper_api_key") or "")[-4:], str(config.get("brave_api_key") or "")[-4:],
+        str(config.get("google_api_key") or "")[-4:], str(config.get("google_cx") or ""),
+    )
     cached = _CACHE.get(cache_key)
     if cached and time.monotonic() - cached[0] < CACHE_TTL:
         payload = dict(cached[1])
@@ -248,20 +285,24 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
         return payload
 
     all_rows, errors = [], []
-    query_plan = _query_plan(query, kind)
-    # Base query fans out to all configured providers. Targeted site queries use the
-    # best available provider first, then DuckDuckGo; this limits API cost and latency.
-    base_calls = _provider_calls(query_plan[0], config, ddg_search)
+    query_plan = _query_plan(query, kind, constraints)
+    base_calls = _provider_calls(query_plan[0], config, ddg_search, constraints)
     base_rows, base_errors = _run_query(base_calls)
     all_rows.extend(base_rows)
     errors.extend(base_errors)
 
-    targeted_provider = next((name for name in ("Google / Serper", "Brave Search", "Google CSE", "DuckDuckGo")
-                              if any(row_provider == name for row_provider, _ in base_rows)), "DuckDuckGo")
-    if len(query_plan) > 1:
+    successful = [name for name, _ in base_rows]
+    preferred = ("SearXNG", "Bing RSS", "DuckDuckGo", "Google / Serper", "Brave Search", "Google CSE")
+    targeted_provider = next((name for name in preferred if name in successful), "")
+    if len(query_plan) > 1 and targeted_provider:
         targeted_calls = []
         for targeted_query in query_plan[1:]:
             def call_targeted(q=targeted_query, provider=targeted_provider):
+                if provider == "SearXNG":
+                    language = constraints.get("language") or ("fa" if _PERSIAN.search(q) else "en")
+                    return search_providers.search_searxng(q, config["searxng_url"], language=language)
+                if provider == "Bing RSS":
+                    return search_providers.search_bing_rss(q)
                 if provider == "Google / Serper":
                     return search_providers.search_serper(q, config["serper_api_key"])
                 if provider == "Brave Search":
@@ -277,14 +318,12 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
     normalized = []
     for provider, row in all_rows:
         item = _normalize_item(row, provider, query, kind)
-        if item:
+        if item and search_plan.result_matches_constraints(item, constraints):
             normalized.append(item)
     results = _dedupe(normalized)
     results.sort(key=lambda item: item["match_score"], reverse=True)
     results = results[:max(1, min(12, int(max_results)))]
 
-    # Fetch page text only for a few top results. The caller supplies the existing SSRF-safe
-    # page reader; a failed fetch never causes an invented or rewritten URL.
     if callable(page_fetch) and results:
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
             future_map = {pool.submit(page_fetch, item["url"]): item for item in results[:3]}
@@ -295,25 +334,28 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS):
                 except Exception:
                     item["content"] = ""
                     item["verified"] = False
+        # Re-check language against extracted text when it was not clear from snippets.
+        results = [item for item in results if search_plan.result_matches_constraints(item, constraints)]
 
     provider_names = list(dict.fromkeys(item["provider"] for item in results))
     payload = {
         "results": results,
         "engine": "multi" if len(provider_names) > 1 else (provider_names[0] if provider_names else "none"),
         "provider": ", ".join(provider_names) if provider_names else "none",
-        "fallback": bool(provider_names and "DuckDuckGo" in provider_names and len(provider_names) == 1),
+        "fallback": bool(errors or (provider_names and len(provider_names) == 1 and provider_names[0] in ("DuckDuckGo", "Bing RSS"))),
         "notice": (
-            "پیوندها از نتایج واقعی موتور جست‌وجو آمده‌اند؛ لینک محصول فقط وقتی «صفحه محصول» برچسب دارد که مسیر آن شبیه صفحه محصول باشد. "
-            "تأیید دسترسی یعنی متن صفحه دریافت شده، نه تضمین موجودی یا قیمت."
+            "نتایج فقط از پیوندهای برگشتی موتورهای جست‌وجو ساخته شده‌اند. "
+            "دریافت متن صفحه، موجودی یا قیمت زنده را تضمین نمی‌کند."
         ),
         "intent": {"kind": kind, "topic": query},
-        "errors": errors[:4],
+        "constraints": constraints,
+        "errors": errors[:5],
         "cached": False,
     }
     if errors:
-        payload["fallback"] = True
-        payload["notice"] += " خطاهای منابع: " + "؛ ".join(errors[:2])
+        payload["notice"] += " برخی منابع پاسخ ندادند: " + "؛ ".join(errors[:2])
     if len(_CACHE) >= _CACHE_LIMIT:
         _CACHE.pop(next(iter(_CACHE)), None)
     _CACHE[cache_key] = (time.monotonic(), payload)
     return payload
+
