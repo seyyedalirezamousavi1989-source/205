@@ -126,7 +126,7 @@ def parse_search_request(raw_query, supplied=None):
         )
         if term_found and extension and extension not in content_types:
             content_types.append(extension)
-    if re.search(r"(?:فایل|file)\\s+ai\\b|\\bfiletype:ai\\b", lower):
+    if re.search(r"(?:فایل|file)\s+ai\b|\bfiletype:ai\b", lower):
         if "ai" not in content_types:
             content_types.append("ai")
     for extension in sorted(_KNOWN_FILE_EXTENSIONS):
