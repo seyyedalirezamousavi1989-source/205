@@ -14,6 +14,10 @@ def test_pyinstaller_specs_point_to_existing_launcher():
     launcher_file = PROJECT_ROOT / "local_chat" / "launcher.py"
 
     assert launcher_file.is_file()
+    launcher_source = launcher_file.read_text(encoding="utf-8")
+    assert "from local_chat import settings as app_settings" in launcher_source
+    assert "from local_chat.version import APP_VERSION" in launcher_source
+    assert "import settings as app_settings" not in launcher_source
     for name in ("localchat.spec", "localchat_onefile.spec"):
         spec = (PROJECT_ROOT / "packaging" / name).read_text(encoding="utf-8")
         assert entry in spec, f"{name} must use the existing launcher entry point"
