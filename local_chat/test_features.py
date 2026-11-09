@@ -621,6 +621,19 @@ class SearchTests(FeatureTestCase):
         self.assertFalse(json.loads(body)["search"]["has_serper_key"])
         self.assertFalse(json.loads(body)["search"]["has_brave_key"])
 
+        status, body = self.call("POST", "/api/settings/search", {
+            "searxng_url": "https://search.example.org"
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)["search"]["has_searxng"])
+        self.assertEqual(json.loads(body)["search"]["searxng_url"], "https://search.example.org")
+        status, _ = self.call("POST", "/api/settings/search", {
+            "searxng_url": "https://search.example.org/private/path"
+        })
+        self.assertEqual(status, 400)
+        self.call("POST", "/api/settings/search", {"searxng_url": ""})
+
+
     @patch("local_chat.server._fetch_public_page", return_value="متن")
     @patch("local_chat.search_providers.urlopen")
     @patch("local_chat.server._ddg_results", return_value=[])
