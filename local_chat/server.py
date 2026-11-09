@@ -1229,7 +1229,7 @@ SEARCH_PROVIDER_LABELS = {
 @register_capability(
     id="web_search",
     name="جست‌وجوی وب",
-    description="جست‌وجوی چندموتورهٔ وب، کشف صفحهٔ محصول در فروشگاه‌های ایرانی، یافتن ویدیو در آپارات و سایت‌های دیگر، و جست‌وجوی رسانه؛ فقط پیوندهای برگشتی از منابع واقعی نمایش داده می‌شوند.",
+    description="جست‌وجوی تطبیقی و رایگان‌محور در وب، سایت‌های ایرانی، محصولات، فایل‌ها و رسانه؛ فیلترهای زبان و دامنه از متن طبیعی مکالمه استخراج می‌شوند و فقط پیوندهای واقعی نمایش داده می‌شوند.",
     purpose="یافتن اطلاعات روزآمد و ارجاع به صفحه‌های وب عمومی.",
     activation_conditions=(
         "جست‌وجوی وب",
@@ -1276,10 +1276,10 @@ SEARCH_PROVIDER_LABELS = {
         "find an image",
     ),
     inputs=("عبارت جست‌وجو",),
-    outputs=("حداکثر هشت نتیجهٔ وب یا رسانه با عنوان، دامنه، نوع پیوند و نشانی واقعی",),
-    dependencies=("اتصال اینترنت", "کلید Brave Search یا Serper برای پوشش بهتر (اختیاری)", "DuckDuckGo به‌عنوان مسیر بدون کلید"),
+    outputs=("حداکثر دوازده نتیجهٔ وب، محصول، فایل یا رسانه با عنوان، دامنه، نوع پیوند و نشانی واقعی",),
+    dependencies=("اتصال اینترنت", "DuckDuckGo و Bing RSS بدون کلید", "SearXNG اختیاری", "APIهای کلیددار فقط به‌عنوان مسیر پشتیبان"),
     limitations=(
-        "کیفیت و پوشش جست‌وجوی بدون کلید به محدودیت‌های موتورهای عمومی وابسته است؛ برای کیفیت بالاتر کلید Brave Search یا Serper توصیه می‌شود.",
+        "هیچ منبع رایگان پوشش کامل اینترنت را تضمین نمی‌کند؛ APIهای کلیددار فقط پس از ناکافی بودن نتایج رایگان فعال می‌شوند.",
         "وجود نتیجه در موتور جست‌وجو تضمین‌کنندهٔ موجودی کالا، قیمت یا دسترسی دائمی به صفحه نیست.",
         "نتیجه‌ها ممکن است ناقص یا محدود شوند.",
         "برخی سایت‌ها اجازهٔ واکشی متن نمی‌دهند.",
@@ -1296,7 +1296,7 @@ def _search_web(query, search_options=None):
     has_constraints = bool(
         parsed.get("strict_domains") or constraints.get("language") or constraints.get("region")
         or constraints.get("allowed_domains") or constraints.get("excluded_domains")
-        or constraints.get("content_types")
+        or constraints.get("content_types") or constraints.get("file_search")
     )
     # Explicit user constraints take precedence over specialized media shortcuts.
     if has_constraints:
