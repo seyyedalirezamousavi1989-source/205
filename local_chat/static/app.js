@@ -468,9 +468,11 @@ function renderSources(article, sources) {
     if (info) link.className = `media-link media-${source.kind}`;
     const host = hostOf(source.url);
     const typeLabel = source.link_type === "product" ? "صفحه محصول" : source.link_type === "video" ? "ویدیو" : source.link_type === "file" ? `فایل${source.file_type ? " · " + source.file_type.toUpperCase() : ""}` : "";
+    const languageLabel = source.language_verified === false ? "زبان تأییدنشده" : "";
+    const detailLabel = [typeLabel, languageLabel].filter(Boolean).join(" · ");
     link.textContent = info
       ? `${info.icon} ${source.title || source.url}${host ? " · " + host : ""}`
-      : `[${index + 1}] ${source.title || source.url}${host ? " · " + host : ""}${typeLabel ? " · " + typeLabel : ""}`;
+      : `[${index + 1}] ${source.title || source.url}${host ? " · " + host : ""}${detailLabel ? " · " + detailLabel : ""}`;
     container.append(link);
   });
   const anchor = article.querySelector(".continue-button");
