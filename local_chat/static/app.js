@@ -467,7 +467,7 @@ function renderSources(article, sources) {
     link.title = [source.title, source.snippet, source.url].filter(Boolean).join("\n");
     if (info) link.className = `media-link media-${source.kind}`;
     const host = hostOf(source.url);
-    const typeLabel = source.link_type === "product" ? "صفحه محصول" : source.link_type === "video" ? "ویدیو" : "";
+    const typeLabel = source.link_type === "product" ? "صفحه محصول" : source.link_type === "video" ? "ویدیو" : source.link_type === "file" ? `فایل${source.file_type ? " · " + source.file_type.toUpperCase() : ""}` : "";
     link.textContent = info
       ? `${info.icon} ${source.title || source.url}${host ? " · " + host : ""}`
       : `[${index + 1}] ${source.title || source.url}${host ? " · " + host : ""}${typeLabel ? " · " + typeLabel : ""}`;
