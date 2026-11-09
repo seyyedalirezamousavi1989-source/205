@@ -854,10 +854,10 @@ async function searchWeb(query, signal) {
 }
 
 function searchQueryFrom(text) {
-  // the server rejects queries over 500 characters: send a short single-line query instead
+  // Preserve natural-language filters while staying within the server limit.
   const flat = text.replace(/\s+/g, " ").trim();
-  if (flat.length <= 300) return flat;
-  const cut = flat.slice(0, 300);
+  if (flat.length <= 500) return flat;
+  const cut = flat.slice(0, 500);
   const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("؟"), cut.lastIndexOf("?"), cut.lastIndexOf(" "));
   return (end > 80 ? cut.slice(0, end) : cut).trim();
 }
