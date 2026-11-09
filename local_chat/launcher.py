@@ -140,6 +140,7 @@ def start_chat_server():
                 stdin=subprocess.DEVNULL,
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
+                env={**os.environ, "LOCALCHAT_STARTUP_LOG": str(log_path)},
                 close_fds=True,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
                 if getattr(sys, "frozen", False)
@@ -186,11 +187,18 @@ def main():
 if __name__ == "__main__":
     if "--localchat-server" in sys.argv:
         # Log even import-time failures; the parent redirects stdout/stderr here.
+        # Windowed PyInstaller builds may initialize sys.stdout/sys.stderr as
+        # None. Reopen the parent's diagnostic file explicitly before imports.
+        child_log = os.environ.get("LOCALCHAT_STARTUP_LOG")
+        if child_log:
+            child_stream = open(child_log, "a", encoding="utf-8", errors="replace")
+            sys.stdout = child_stream
+            sys.stderr = child_stream
         try:
             from local_chat.server import main as server_main
             server_main()
         except BaseException:
-            traceback.print_exc()
+            traceback.print_exc(file=sys.stderr)
             raise
     else:
         raise SystemExit(main())
