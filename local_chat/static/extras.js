@@ -571,7 +571,8 @@ const searchEngineSelect = document.getElementById("searchEngine");
 const serperKeyInput = document.getElementById("serperKey");
 const braveKeyInput = document.getElementById("braveKey");
 const googleKeyInput = document.getElementById("googleKey");
-const googleCxInput = document.getElementById("googleCx");\nconst searxngUrlInput = document.getElementById("searxngUrl");
+const googleCxInput = document.getElementById("googleCx");
+const searxngUrlInput = document.getElementById("searxngUrl");
 const searchStatus = document.getElementById("searchStatus");
 
 function showSearchSettings(search) {
@@ -583,12 +584,14 @@ function showSearchSettings(search) {
   serperKeyInput.placeholder = search.has_serper_key ? `Serper ذخیره شده (${search.serper_hint}) — برای تغییر، کلید تازه بنویس` : "Serper API key";
   braveKeyInput.placeholder = search.has_brave_key ? `Brave ذخیره شده (${search.brave_hint}) — برای تغییر، کلید تازه بنویس` : "Brave Search API key";
   googleKeyInput.placeholder = search.google_api_hint ? `Google key ذخیره شده (${search.google_api_hint})` : "Google API key (اختیاری)";
-  googleCxInput.value = search.google_cx || "";\n  searxngUrlInput.value = search.searxng_url || "";
+  googleCxInput.value = search.google_cx || "";
+  searxngUrlInput.value = search.searxng_url || "";
   setSearchEngineLabel(search.engine);
   const parts = [];
   if (search.engine === "auto") parts.push("حالت خودکار: ترکیب موتورهای در دسترس");
   if (search.has_serper_key) parts.push("Serper فعال");
-  if (search.has_brave_key) parts.push("Brave فعال");\n  if (search.has_searxng) parts.push("SearXNG تنظیم شده");
+  if (search.has_brave_key) parts.push("Brave فعال");
+  if (search.has_searxng parts.push("SearXNG تنظیم شده");
   if (!search.has_serper_key && !search.has_brave_key && !search.has_google_cse) {
     parts.push("بدون کلید: جست‌وجوی رایگان با پوشش محدودتر");
   }
