@@ -118,10 +118,11 @@ def parse_search_request(raw_query, supplied=None):
     ]
     for pattern in patterns:
         query = re.sub(pattern, " ", query, flags=re.I)
-    for raw in _DOMAIN.findall(original):
-        query = query.replace(raw, " ")
-    for alias in _ALIASES:
-        query = re.sub(re.escape(alias), " ", query, flags=re.I)
+    if only_site or exclude_site:
+        for raw in _DOMAIN.findall(original):
+            query = query.replace(raw, " ")
+        for alias in _ALIASES:
+            query = re.sub(re.escape(alias), " ", query, flags=re.I)
     query = re.sub(r"[،,;؛]+", " ", query)
     query = re.sub(r"\\s+", " ", query).strip(" -:")
     if len(query) < 2:
@@ -166,7 +167,7 @@ def result_matches_constraints(item, constraints):
     if language == "fa":
         sample = " ".join((item.get("title") or "", item.get("snippet") or "", item.get("content") or ""))
         letters = [c for c in sample if c.isalpha()]
-        if len(letters) >= 40 and sum(1 for c in letters if "\\u0600" <= c <= "\\u06ff") / len(letters) < 0.08:
+        if len(letters) >= 10 and sum(1 for c in letters if "\\u0600" <= c <= "\\u06ff") / len(letters) < 0.08:
             return False
     region = constraints.get("region")
     if region == "IR":
@@ -177,7 +178,7 @@ def result_matches_constraints(item, constraints):
     types = constraints.get("content_types") or []
     if types:
         path = urlsplit(item.get("url", "")).path.lower()
-        if not any(path.endswith("." + ext) or ("filetype:" + ext) in (item.get("query") or "") for ext in types):
+        if not any(path.endswith("." + ext) for ext in types):
             # Search snippets sometimes link to landing pages rather than files; keep them if the provider labels the type.
             if str(item.get("mime_type") or "").lower() not in {"application/pdf", "application/msword",
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
