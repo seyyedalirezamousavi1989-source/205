@@ -149,8 +149,8 @@ def parse_search_request(raw_query, supplied=None):
             query = query.replace(raw, " ")
         for alias in _ALIASES:
             query = re.sub(re.escape(alias), " ", query, flags=re.I)
-        query = re.sub(r"(?:فقط|صرفا|صرفاً)\\s*(?:در\\s*)?(?:سایت|دامنه|وبسایت|وب\\s*سایت)", " ", query, flags=re.I)
-        query = re.sub(r"(?:به\\s*جز|به\\s*غیر\\s*از|غیر\\s*از|به\\s*استثنای)", " ", query, flags=re.I)
+        query = re.sub(r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:سایت|دامنه|وبسایت|وب\s*سایت)", " ", query, flags=re.I)
+        query = re.sub(r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای)", " ", query, flags=re.I)
     query = re.sub(r"[،,;؛]+", " ", query)
     query = re.sub(r"\s+", " ", query).strip(" -:")
     if len(query) < 2:
