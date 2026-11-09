@@ -27,6 +27,25 @@ def test_explicit_domain_allow_and_deny_lists():
     assert search_plan.host_allowed("other.com", excluded["constraints"])
 
 
+def test_site_alias_without_word_site_is_understood_and_removed_from_query():
+    plan = search_plan.parse_search_request("قیمت RTX 5070 فقط دیجی‌کالا")
+    assert plan["constraints"]["allowed_domains"] == ["digikala.com"]
+    assert plan["strict_domains"] is True
+    assert plan["query"] == "قیمت RTX 5070"
+
+
+def test_persian_sites_filter_does_not_require_a_domain():
+    plan = search_plan.parse_search_request("مقاله هوش مصنوعی فقط سایت‌های فارسی")
+    assert plan["constraints"]["language"] == "fa"
+    assert plan["strict_domains"] is False
+
+
+def test_generic_file_search_marks_direct_file_results():
+    plan = search_plan.parse_search_request("فایل‌های مربوط به آموزش پایتون را پیدا کن")
+    assert plan["constraints"]["file_search"] is True
+    assert plan["constraints"]["content_types"] == []
+
+
 def test_ordinary_site_mention_is_preserved_as_search_content():
     plan = search_plan.parse_search_request("ویدیو آموزش پایتون در آپارات پیدا کن")
     assert "آپارات" in plan["query"]
