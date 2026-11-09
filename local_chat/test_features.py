@@ -634,10 +634,11 @@ class SearchTests(FeatureTestCase):
         self.call("POST", "/api/settings/search", {"searxng_url": ""})
 
 
+    @patch("local_chat.search_providers.search_bing_rss", return_value=[])
     @patch("local_chat.server._fetch_public_page", return_value="متن")
     @patch("local_chat.search_providers.urlopen")
     @patch("local_chat.server._ddg_results", return_value=[])
-    def test_google_via_serper(self, _ddg, mock_open, _page):
+    def test_google_via_serper(self, _ddg, mock_open, _page, _bing):
         app_settings.set_search_settings({"serper_api_key": "abcd1234efgh5678"})
         payload = {"organic": [
             {"title": "نتیجه ۱", "link": "https://example.com/a", "snippet": "خلاصه"},
@@ -654,10 +655,11 @@ class SearchTests(FeatureTestCase):
         self.assertEqual(request.get_header("X-api-key"), "abcd1234efgh5678")
         self.assertEqual(json.loads(request.data)["hl"], "fa")
 
+    @patch("local_chat.search_providers.search_bing_rss", return_value=[])
     @patch("local_chat.server._fetch_public_page", return_value="")
     @patch("local_chat.search_providers.urlopen")
     @patch("local_chat.server._ddg_results", return_value=[])
-    def test_google_cse_provider(self, _ddg, mock_open, _page):
+    def test_google_cse_provider(self, _ddg, mock_open, _page, _bing):
         app_settings.set_search_settings({"google_api_key": "AIzaSyFAKEKEY12345", "google_cx": "cx123"})
         mock_open.return_value = FakeHttp(json.dumps({"items": [
             {"title": "T", "link": "https://example.org/x", "snippet": "S"}]}).encode())
@@ -665,9 +667,10 @@ class SearchTests(FeatureTestCase):
         self.assertEqual(data["provider"], "Google CSE")
         self.assertIn("key=AIzaSyFAKEKEY12345", mock_open.call_args.args[0].full_url)
 
+    @patch("local_chat.search_providers.search_bing_rss", return_value=[])
     @patch("local_chat.server._ddg_results", return_value=[{"title": "d", "url": "https://d.example/", "snippet": "", "content": ""}])
     @patch("local_chat.search_providers.urlopen")
-    def test_falls_back_to_duckduckgo_and_says_so(self, mock_open, _ddg):
+    def test_falls_back_to_duckduckgo_and_says_so(self, mock_open, _ddg, _bing):
         from urllib.error import HTTPError
 
         app_settings.set_search_settings({"serper_api_key": "abcd1234efgh5678"})
