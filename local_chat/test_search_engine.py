@@ -79,6 +79,33 @@ def test_explicit_site_filter_is_strict_and_dynamic(monkeypatch):
     assert [row["url"] for row in result["results"]] == ["https://shop.example.com/product/1"]
 
 
+def test_auto_prefers_keyless_providers_before_paid_fallback():
+    calls = search_engine._provider_calls(
+        "RTX 5070", {
+            "engine": "auto",
+            "serper_api_key": "serper-test-key",
+            "brave_api_key": "brave-test-key",
+        }, lambda _q: [],
+    )
+    names = [name for name, _call in calls]
+    assert "DuckDuckGo" in names
+    assert "Bing RSS" in names
+    assert "Google / Serper" not in names
+    assert "Brave Search" not in names
+    paid = search_engine._paid_provider_calls(
+        "RTX 5070", {
+            "serper_api_key": "serper-test-key",
+            "brave_api_key": "brave-test-key",
+        },
+    )
+    assert {name for name, _call in paid} == {"Google / Serper", "Brave Search"}
+
+
+def test_product_detection_includes_common_consumer_products():
+    assert search_engine.classify("قیمت گوشی آیفون 17") == "product"
+    assert search_engine.classify("خرید کفش ورزشی") == "product"
+
+
 def test_empty_search_does_not_call_provider():
     with pytest.raises(search_engine.SearchError):
         search_engine.search("   ", {"engine": "auto"}, lambda _q: pytest.fail("must not search"))
