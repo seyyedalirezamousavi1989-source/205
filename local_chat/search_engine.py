@@ -290,6 +290,8 @@ def _query_plan(query, kind, constraints=None):
         queries.extend(f"site:{domain} {q}" for domain in _VIDEO_SITES)
     for ext in constraints.get("content_types") or []:
         queries[0] += f" filetype:{ext}"
+    if constraints.get("file_search") and not constraints.get("content_types"):
+        queries.extend(f"{q} filetype:{ext}" for ext in ("pdf", "docx", "xlsx", "zip"))
     return list(dict.fromkeys(queries))[:MAX_QUERIES]
 
 
