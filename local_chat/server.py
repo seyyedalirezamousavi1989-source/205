@@ -43,7 +43,7 @@ if __package__:
     from . import settings as app_settings
     from . import files as attach_files
     from . import models_catalog
-    from . import search_providers, search_intent, media_search, search_engine, search_plan, search_plan
+    from . import search_providers, search_intent, media_search, search_engine, search_plan
     from . import version as version_info
     from . import system_tools
     from . import coding_agent
@@ -61,7 +61,7 @@ else:
     import settings as app_settings
     import files as attach_files
     import models_catalog
-    import search_providers, search_intent, media_search, search_engine
+    import search_providers, search_intent, media_search, search_engine, search_plan
     import version as version_info
     import system_tools
     import coding_agent
