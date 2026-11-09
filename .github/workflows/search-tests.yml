@@ -8,6 +8,10 @@ on:
     branches:
       - main
     paths:
+      - "local_chat/launcher.py"
+      - "local_chat/test_packaging.py"
+      - "packaging/*.spec"
+      - "build_installer.bat"
       - "local_chat/search_engine.py"
       - "local_chat/search_plan.py"
       - "local_chat/search_providers.py"
