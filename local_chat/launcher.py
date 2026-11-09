@@ -98,8 +98,16 @@ def start_chat_server():
             "درگاه ۸۰۰۰ توسط برنامهٔ دیگری استفاده شده است. آن برنامه را ببندید و دوباره تلاش کنید."
         )
 
+    # In a PyInstaller build, sys.executable is LocalChat.exe, not python.exe.
+    # Relaunch the frozen application in its server mode instead of passing
+    # server.py as a script (which would simply reopen the GUI launcher).
+    command = (
+        [sys.executable, "--localchat-server"]
+        if getattr(sys, "frozen", False)
+        else [sys.executable, str(SERVER_FILE)]
+    )
     subprocess.Popen(
-        [sys.executable, str(SERVER_FILE)],
+        command,
         cwd=APP_DIR,
         creationflags=subprocess.CREATE_NEW_CONSOLE,
     )
@@ -125,4 +133,10 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    if "--localchat-server" in sys.argv:
+        # This path is used only by the frozen executable's child process.
+        from local_chat.server import main as server_main
+
+        server_main()
+    else:
+        raise SystemExit(main())
