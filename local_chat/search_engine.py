@@ -145,7 +145,10 @@ def _normalize_item(item, provider, query, kind):
         "provider": provider,
         "search_kind": kind,
         "match_score": round(min(1.0, score), 3),
-        "link_type": "product" if kind == "product" and product_path else (\n            "video" if kind == "video" and video_url else ("file" if is_file else "webpage")\n        ),\n        "file_type": file_type,
+        "link_type": "product" if kind == "product" and product_path else (
+            "video" if kind == "video" and video_url else ("file" if is_file else "webpage")
+        ),
+        "file_type": file_type,
         "verified": False,
         "query": query,
         "mime_type": mime_type,
