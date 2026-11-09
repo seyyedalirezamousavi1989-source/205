@@ -117,10 +117,16 @@ def parse_search_request(raw_query, supplied=None):
     ]
     file_search = bool(re.search(r"\bfiles?\b|\bdocuments?\b|فایل|اسناد?|مدارک", lower))
     for term, extension in _FILE_EXTENSIONS.items():
-        if term in lower and extension and extension not in content_types:
+        term_found = (
+            bool(re.search(r"\b" + re.escape(term) + r"\b", lower))
+            if re.fullmatch(r"[a-z0-9]+", term) else term in lower
+        )
+        if term_found and extension and extension not in content_types:
             content_types.append(extension)
-    for extension in _KNOWN_FILE_EXTENSIONS:
-        if re.search(r"\b" + re.escape(extension) + r"\b", lower) and extension not in content_types:
+    for extension in sorted(_KNOWN_FILE_EXTENSIONS):
+        explicit_filetype = re.search(r"\bfiletype:\s*" + re.escape(extension) + r"\b", lower)
+        mentioned_with_file = file_search and re.search(r"\b" + re.escape(extension) + r"\b", lower)
+        if (explicit_filetype or mentioned_with_file) and extension not in content_types:
             content_types.append(extension)
     if content_types:
         file_search = True
