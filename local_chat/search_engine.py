@@ -111,6 +111,13 @@ def _normalize_item(item, provider, query, kind):
         or ("youtube.com" in host and p.path == "/watch" and "v=" in p.query)
         or ("youtu.be" in host and len(p.path.strip("/")) >= 6)
     )
+    mime_type = str(item.get("mime_type") or "").lower()
+    file_type = next((ext for ext in sorted(search_plan._KNOWN_FILE_EXTENSIONS)
+                      if p.path.lower().endswith("." + ext)), "")
+    is_file = bool(file_type or (
+        mime_type.startswith(("application/", "audio/", "video/", "image/"))
+        and mime_type != "application/xhtml+xml"
+    ))
     title_match = _token_overlap(query, title + " " + snippet)
     score = 0.25 + min(title_match, 0.45)
     if kind == "product":
@@ -138,12 +145,10 @@ def _normalize_item(item, provider, query, kind):
         "provider": provider,
         "search_kind": kind,
         "match_score": round(min(1.0, score), 3),
-        "link_type": "product" if kind == "product" and product_path else (
-            "video" if kind == "video" and video_url else "webpage"
-        ),
+        "link_type": "product" if kind == "product" and product_path else (\n            "video" if kind == "video" and video_url else ("file" if is_file else "webpage")\n        ),\n        "file_type": file_type,
         "verified": False,
         "query": query,
-        "mime_type": str(item.get("mime_type") or ""),
+        "mime_type": mime_type,
     }
 
 
