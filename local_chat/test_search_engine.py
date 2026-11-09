@@ -27,6 +27,7 @@ def test_normalizer_only_accepts_real_http_links_and_marks_product_pages():
 
 def test_product_search_uses_targeted_queries_and_never_invents_urls(monkeypatch):
     search_engine._CACHE.clear()
+    monkeypatch.setattr(search_engine.search_providers, "search_bing_rss", lambda _q: [])
     seen = []
     actual_url = "https://www.digikala.com/product/dkp-123/"
     def ddg(query):
@@ -44,8 +45,9 @@ def test_product_search_uses_targeted_queries_and_never_invents_urls(monkeypatch
     assert result["results"][0]["verified"] is True
 
 
-def test_video_search_expands_to_aparat_and_preserves_provider_url():
+def test_video_search_expands_to_aparat_and_preserves_provider_url(monkeypatch):
     search_engine._CACHE.clear()
+    monkeypatch.setattr(search_engine.search_providers, "search_bing_rss", lambda _q: [])
     seen = []
     actual_url = "https://www.aparat.com/v/abc123"
     def ddg(query):
