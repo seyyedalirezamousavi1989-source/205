@@ -33,5 +33,5 @@ jobs:
         run: python -m compileall -q local_chat
       - name: Check JavaScript syntax
         run: node --check local_chat/static/app.js && node --check local_chat/static/extras.js
-      - name: Run isolated search tests
-        run: python -m pytest -q local_chat/test_search_engine.py local_chat/test_search_plan.py local_chat/test_search_providers.py
+      - name: Run complete local_chat test suite
+        run: python -m pytest -q local_chat
