@@ -52,6 +52,8 @@ def test_ai_topic_is_not_mistaken_for_an_ai_file_extension():
     plan = search_plan.parse_search_request("مقاله درباره AI و یادگیری ماشین")
     assert plan["constraints"]["content_types"] == []
     assert plan["constraints"]["file_search"] is False
+    file_plan = search_plan.parse_search_request("فایل درباره AI و یادگیری ماشین")
+    assert file_plan["constraints"]["content_types"] == []
 
 
 def test_generic_file_search_marks_direct_file_results():
