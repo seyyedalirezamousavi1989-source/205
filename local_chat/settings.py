@@ -116,8 +116,8 @@ def ollama_environment():
 # --- web search -------------------------------------------------------------------
 
 SEARCH_ENGINES = ("auto", "google", "brave", "duckduckgo", "searxng")
-_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_\\-.]{8,200}$")
-_CX_PATTERN = re.compile(r"^[A-Za-z0-9:_\\-.]{3,120}$")
+_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_\-.]{8,200}$")
+_CX_PATTERN = re.compile(r"^[A-Za-z0-9:_\-.]{3,120}$")
 SEARCH_KEY_FIELDS = {
     "serper_api_key": _KEY_PATTERN,
     "brave_api_key": _KEY_PATTERN,
