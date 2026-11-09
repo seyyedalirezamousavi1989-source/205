@@ -29,9 +29,11 @@ _CACHE = {}
 _CACHE_LIMIT = 96
 
 _PRODUCT = re.compile(
-    r"(?:کارت\s*گرافیک|گرافیک|پردازنده|سی\s*پی\s*یو|مادربرد|رم|حافظه|اس\s*اس\s*دی|"
-    r"مانیتور|لپ\s*تاپ|موس|کیبورد|پاور|کیس|محصول|product|gpu|cpu|"
-    r"rtx\s*\d{3,4}|gtx\s*\d{3,4}|rx\s*\d{3,4})", re.I
+    r"(?:کارت\\s*گرافیک|گرافیک|پردازنده|سی\\s*پی\\s*یو|مادربرد|رم|حافظه|اس\\s*اس\\s*دی|"
+    r"مانیتور|لپ\\s*تاپ|موس|کیبورد|پاور|کیس|محصول|گوشی|موبایل|تبلت|هدفون|هندزفری|اسپیکر|"
+    r"دوربین|کنسول|تلویزیون|ساعت\\s*هوشمند|کفش|لباس|کتاب|لوازم\\s*خانگی|خرید|"
+    r"iphone|ipad|macbook|galaxy|pixel|playstation|ps5|xbox|headphones|camera|product|gpu|cpu|"
+    r"rtx\\s*\\d{3,4}|gtx\\s*\\d{3,4}|rx\\s*\\d{3,4})", re.I
 )
 _VIDEO = re.compile(r"(?:آپارات|ویدیو|ویدئو|کلیپ|فیلم|تریلر|aparat|youtube|video|watch)", re.I)
 _PERSIAN = re.compile(r"[\u0600-\u06FF]")
@@ -362,8 +364,9 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, 
             errors.extend(paid_errors)
             successful.extend(paid_successful)
 
+    providers_with_hits = list(dict.fromkeys(name for name, _row in all_rows))
     targeted_provider = max(
-        dict.fromkeys(successful or ["DuckDuckGo"]),
+        providers_with_hits or ["DuckDuckGo"],
         key=lambda name: _provider_score(name, language),
     )
     if len(query_plan) > 1 and targeted_provider:
