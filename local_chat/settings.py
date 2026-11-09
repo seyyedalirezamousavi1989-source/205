@@ -183,7 +183,7 @@ def set_search_settings(update):
             else:
                 from urllib.parse import urlsplit
                 parts = urlsplit(value)
-                if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.query or parts.fragment:
+                if parts.scheme != "https" or not parts.hostname or parts.path not in ("", "/") or parts.username or parts.password or parts.query or parts.fragment:
                     raise ValueError("نشانی SearXNG باید HTTPS و بدون مسیر، پارامتر یا اطلاعات ورود باشد.")
                 search["searxng_url"] = value
         for field, pattern in SEARCH_KEY_FIELDS.items():
