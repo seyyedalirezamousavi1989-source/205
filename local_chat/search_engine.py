@@ -416,9 +416,10 @@ def search(query, config, ddg_search, page_fetch=None, max_results=MAX_RESULTS, 
     results.sort(key=lambda item: item["match_score"], reverse=True)
     results = results[:max(1, min(12, int(max_results)))]
 
-    if callable(page_fetch) and results:
+    fetchable_pages = [item for item in results if item.get("link_type") != "file"]
+    if callable(page_fetch) and fetchable_pages:
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-            future_map = {pool.submit(page_fetch, item["url"]): item for item in results[:3]}
+            future_map = {pool.submit(page_fetch, item["url"]): item for item in fetchable_pages[:3]}
             for future, item in future_map.items():
                 try:
                     item["content"] = future.result() or ""
