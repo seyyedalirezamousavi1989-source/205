@@ -129,8 +129,8 @@ def parse_search_request(raw_query, supplied=None):
     patterns = [
         r"(?:فقط|صرفا|صرفاً)\s*(?:سایت(?:های|\s*های)?|منابع?)\s*(?:فارسی|ایرانی)",
         r"(?:فقط|صرفا|صرفاً)\s*(?:فروشگاه(?:های|\s*های)?|سایت(?:های|\s*های)?|منابع?)\s*ایرانی",
-        r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:سایت|دامنه|وبسایت|وب\s*سایت)\s+[\w.-]+",
-        r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای)\s+(?:سایت\s+)?[\w.-]+",
+        r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:سایت|دامنه|وبسایت|وب\s*سایت)\s+[\w.-]+\.[a-z]{2,}",
+        r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای)\s+(?:سایت\s+)?[\w.-]+\.[a-z]{2,}",
         r"only\s+persian\s+(?:sites|sources)",
         r"iranian\s+(?:sites|stores|sources)\s+only",
         r"only\s+(?:the\s+)?(?:site|domain|website)\s+[\w.-]+",
@@ -139,7 +139,7 @@ def parse_search_request(raw_query, supplied=None):
     for pattern in patterns:
         query = re.sub(pattern, " ", query, flags=re.I)
     if only_site:
-        query = re.sub(r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:" + alias_pattern + r")", " ", query, flags=re.I)
+        query = re.sub(r"(?:فقط|صرفا|صرفاً)\s*(?:در\s*)?(?:سایت\s*)?(?:" + alias_pattern + r")", " ", query, flags=re.I)
         query = re.sub(r"only\s+(?:on\s+)?" + r"(?:" + alias_pattern + r")", " ", query, flags=re.I)
     if exclude_site:
         query = re.sub(r"(?:به\s*جز|به\s*غیر\s*از|غیر\s*از|به\s*استثنای)\s*(?:سایت\s*)?(?:" + alias_pattern + r")", " ", query, flags=re.I)
@@ -149,6 +149,8 @@ def parse_search_request(raw_query, supplied=None):
             query = query.replace(raw, " ")
         for alias in _ALIASES:
             query = re.sub(re.escape(alias), " ", query, flags=re.I)
+        query = re.sub(r"(?:فقط|صرفا|صرفاً)\\s*(?:در\\s*)?(?:سایت|دامنه|وبسایت|وب\\s*سایت)", " ", query, flags=re.I)
+        query = re.sub(r"(?:به\\s*جز|به\\s*غیر\\s*از|غیر\\s*از|به\\s*استثنای)", " ", query, flags=re.I)
     query = re.sub(r"[،,;؛]+", " ", query)
     query = re.sub(r"\s+", " ", query).strip(" -:")
     if len(query) < 2:
